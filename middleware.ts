@@ -40,15 +40,31 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
+    // Fetch user role for all dashboard requests
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const role = profile?.role ?? 'student'
+
     // Root /dashboard → redirect to role-specific dashboard
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+      const dest = request.nextUrl.clone()
+      dest.pathname = `/dashboard/${role}`
+      return NextResponse.redirect(dest)
+    }
 
-      const role = profile?.role ?? 'student'
+    // Protect admin routes from non-admins
+    if (pathname.startsWith('/dashboard/admin') && role !== 'admin') {
+      const dest = request.nextUrl.clone()
+      dest.pathname = `/dashboard/${role}`
+      return NextResponse.redirect(dest)
+    }
+
+    // Protect staff routes from non-staff/non-admin
+    if (pathname.startsWith('/dashboard/staff') && role !== 'staff' && role !== 'admin') {
       const dest = request.nextUrl.clone()
       dest.pathname = `/dashboard/${role}`
       return NextResponse.redirect(dest)
@@ -59,8 +75,14 @@ export async function middleware(request: NextRequest) {
 
   // ── Redirect already-authenticated users away from auth pages ────────────
   if ((pathname === '/login' || pathname === '/register') && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    const role = profile?.role ?? 'student'
     const dest = request.nextUrl.clone()
-    dest.pathname = '/dashboard'
+    dest.pathname = `/dashboard/${role}`
     return NextResponse.redirect(dest)
   }
 

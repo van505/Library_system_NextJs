@@ -6,7 +6,7 @@ import { Bell, Search, ChevronRight } from 'lucide-react'
 
 // Dummy component to fetch unread requests if admin/staff
 async function TopBarRight({ profile }: { profile: any }) {
-  const isStaff = profile.role === 'admin' || profile.role === 'staff'
+  const isStaff = profile?.role === 'admin' || profile?.role === 'staff'
   let pendingBadge = 0
 
   if (isStaff) {

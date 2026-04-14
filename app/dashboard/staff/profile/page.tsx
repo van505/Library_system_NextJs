@@ -8,52 +8,28 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
-import { User, Mail, Lock, GraduationCap, Calendar, BookOpen, Star } from 'lucide-react'
+import { User, Mail, Phone, Lock, Briefcase, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { Profile } from '@/lib/supabase'
 
-export default function StudentProfilePage() {
+export default function StaffProfilePage() {
   const supabase = createClient()
   const { profile, setProfile } = useAuthStore()
   const [email, setEmail] = React.useState('')
   const [fullName, setFullName] = React.useState('')
-  const [studentId, setStudentId] = React.useState('')
-  const [gradeLevel, setGradeLevel] = React.useState('')
   const [contactNumber, setContactNumber] = React.useState('')
   const [newPassword, setNewPassword] = React.useState('')
   const [confirmPassword, setConfirmPassword] = React.useState('')
   const [saving, setSaving] = React.useState(false)
   const [changingPassword, setChangingPassword] = React.useState(false)
-  const [stats, setStats] = React.useState({ totalBorrowed: 0, favoriteGenre: '-' })
-  const [loadingStats, setLoadingStats] = React.useState(true)
 
   React.useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setEmail(user.email ?? '')
-        // Fetch reading stats
-        const { data: txs } = await supabase
-          .from('transactions')
-          .select('book_id, books(genre)')
-          .eq('borrower_id', user.id)
-        const total = txs?.length ?? 0
-        // Find favorite genre
-        const genreCount: Record<string, number> = {}
-        for (const tx of txs ?? []) {
-          const genre = (tx.books as any)?.genre
-          if (genre) genreCount[genre] = (genreCount[genre] ?? 0) + 1
-        }
-        const fav = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '-'
-        setStats({ totalBorrowed: total, favoriteGenre: fav })
-        setLoadingStats(false)
-      }
+      if (user) setEmail(user.email ?? '')
       if (profile) {
         setFullName(profile.full_name ?? '')
-        setStudentId(profile.student_id ?? '')
-        setGradeLevel(profile.grade_level ?? '')
         setContactNumber(profile.contact_number ?? '')
       }
     }
@@ -66,12 +42,7 @@ export default function StudentProfilePage() {
     setSaving(true)
     const { data, error } = await supabase
       .from('profiles')
-      .update({
-        full_name: fullName,
-        student_id: studentId || null,
-        grade_level: gradeLevel || null,
-        contact_number: contactNumber || null,
-      })
+      .update({ full_name: fullName, contact_number: contactNumber })
       .eq('id', profile.id)
       .select()
       .single()
@@ -94,60 +65,41 @@ export default function StudentProfilePage() {
     setChangingPassword(false)
   }
 
-  const initials = (profile?.full_name ?? 'U').charAt(0).toUpperCase()
+  const initials = (profile?.full_name ?? 'S').charAt(0).toUpperCase()
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-        <p className="text-slate-500 text-sm mt-1">Manage your student account and personal details.</p>
+        <p className="text-slate-500 text-sm mt-1">Manage your account settings.</p>
       </div>
 
-      {/* Avatar & identity */}
       <Card className="rounded-2xl border-slate-200 shadow-sm">
-        <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          <div className="size-20 rounded-full bg-gradient-to-br from-emerald-500 to-indigo-600 flex items-center justify-center shadow-lg shrink-0">
+        <CardContent className="p-6 flex items-center gap-6">
+          <div className="size-20 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shrink-0">
             <span className="text-3xl font-bold text-white">{initials}</span>
           </div>
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-bold text-slate-900">{profile?.full_name ?? 'Student'}</h2>
-              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
-                <GraduationCap className="size-3 mr-1" /> Student
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-900">{profile?.full_name ?? 'Staff'}</h2>
+              <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100 border-none">
+                <Briefcase className="size-3 mr-1" /> Staff
               </Badge>
-              {profile?.grade_level && <Badge variant="outline" className="text-xs">{profile.grade_level}</Badge>}
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500"><Mail className="size-4" />{email}</div>
-            {profile?.student_id && <div className="text-xs text-slate-400">ID: {profile.student_id}</div>}
             {profile?.created_at && (
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <Calendar className="size-3.5" /> Member since {format(new Date(profile.created_at), 'MMMM d, yyyy')}
               </div>
             )}
           </div>
-          {/* Reading stats */}
-          <div className="flex gap-4 shrink-0">
-            <div className="text-center">
-              {loadingStats ? <Skeleton className="h-8 w-12 mx-auto rounded-lg" /> : (
-                <p className="text-2xl font-bold text-indigo-600">{stats.totalBorrowed}</p>
-              )}
-              <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5"><BookOpen className="size-3" /> Borrowed</div>
-            </div>
-            <div className="text-center">
-              {loadingStats ? <Skeleton className="h-8 w-16 mx-auto rounded-lg" /> : (
-                <p className="text-sm font-bold text-indigo-600 mt-1">{stats.favoriteGenre}</p>
-              )}
-              <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5"><Star className="size-3" /> Fav Genre</div>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
-      {/* Edit profile */}
       <Card className="rounded-2xl border-slate-200 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><User className="size-4 text-indigo-600" /> Personal Information</CardTitle>
-          <CardDescription>Keep your details up to date.</CardDescription>
+          <CardDescription>Update your name and contact details.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -161,20 +113,12 @@ export default function StudentProfilePage() {
                 <Input id="contact" type="tel" className="rounded-xl" placeholder="+63 912 345 6789" value={contactNumber} onChange={e => setContactNumber(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="studentId">Student ID</Label>
-                <Input id="studentId" className="rounded-xl" placeholder="STU-0001" value={studentId} onChange={e => setStudentId(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="gradeLevel">Grade Level</Label>
-                <Input id="gradeLevel" className="rounded-xl" placeholder="e.g. Grade 10" value={gradeLevel} onChange={e => setGradeLevel(e.target.value)} />
-              </div>
-              <div className="space-y-2">
                 <Label>Email Address</Label>
                 <Input value={email} disabled className="rounded-xl bg-slate-50 text-slate-400" />
               </div>
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Input value="Student" disabled className="rounded-xl bg-slate-50 text-slate-400" />
+                <Input value="Library Staff" disabled className="rounded-xl bg-slate-50 text-slate-400" />
               </div>
             </div>
             <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl" disabled={saving}>
@@ -184,11 +128,10 @@ export default function StudentProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Change password */}
       <Card className="rounded-2xl border-slate-200 shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2"><Lock className="size-4 text-indigo-600" /> Change Password</CardTitle>
-          <CardDescription>Update your password regularly for security.</CardDescription>
+          <CardDescription>Keep your account secure with a strong password.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleChangePassword} className="space-y-4">

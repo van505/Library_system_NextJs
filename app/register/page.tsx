@@ -13,21 +13,31 @@ import { BookOpen } from 'lucide-react'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [studentId, setStudentId] = useState('')
+  const [gradeLevel, setGradeLevel] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const { data: authData, error: authError } = await supabase.auth.signUp({ 
-      email, 
+
+    const supabase = createClient()
+
+    // 1. Sign up with Supabase Auth, passing metadata for the trigger
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
       password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: 'student',
+        },
+      },
     })
-    
+
     if (authError) {
       toast.error(authError.message)
       setLoading(false)
@@ -35,20 +45,24 @@ export default function RegisterPage() {
     }
 
     if (authData.user) {
-      const { error: profileError } = await supabase.from('profiles').insert([{
+      // 2. Explicitly insert row into profiles (trigger is a backup)
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: authData.user.id,
         full_name: fullName,
         role: 'student',
         student_id: studentId || null,
-        is_active: true
-      }])
+        grade_level: gradeLevel || null,
+        is_active: true,
+      })
 
       if (profileError) {
-        toast.error('Account created but profile setup failed.')
+        // Trigger will handle it — just warn, still redirect
+        toast.error('Profile setup had a minor issue; please update it from your dashboard.')
       } else {
-        toast.success('Account registered successfully! You can now log in.')
-        router.push('/login')
+        toast.success('Account created! Please sign in.')
       }
+
+      router.push('/login')
     }
     setLoading(false)
   }
@@ -63,7 +77,7 @@ export default function RegisterPage() {
             </div>
             <span className="font-bold text-xl tracking-tight">SchoolLib</span>
           </Link>
-          
+
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight mb-2">Create an account</h1>
             <p className="text-slate-500">Sign up to start borrowing books.</p>
@@ -74,9 +88,13 @@ export default function RegisterPage() {
               <Label htmlFor="fullName">Full Name</Label>
               <Input id="fullName" required className="h-11 rounded-xl bg-slate-50" value={fullName} onChange={e => setFullName(e.target.value)} />
             </div>
-             <div className="space-y-2">
+            <div className="space-y-2">
               <Label htmlFor="studentId">Student ID <span className="text-slate-400 font-normal">(Optional)</span></Label>
               <Input id="studentId" className="h-11 rounded-xl bg-slate-50" value={studentId} onChange={e => setStudentId(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gradeLevel">Grade Level <span className="text-slate-400 font-normal">(Optional)</span></Label>
+              <Input id="gradeLevel" placeholder="e.g. Grade 10, Year 2..." className="h-11 rounded-xl bg-slate-50" value={gradeLevel} onChange={e => setGradeLevel(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
@@ -84,10 +102,10 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required className="h-11 rounded-xl bg-slate-50" value={password} onChange={e => setPassword(e.target.value)} />
+              <Input id="password" type="password" required minLength={6} className="h-11 rounded-xl bg-slate-50" value={password} onChange={e => setPassword(e.target.value)} />
             </div>
             <Button type="submit" className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl mt-4" disabled={loading}>
-              {loading ? 'Processing...' : 'Create Account'}
+              {loading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
 
@@ -101,6 +119,11 @@ export default function RegisterPage() {
       </div>
       <div className="hidden lg:flex flex-1 relative bg-slate-900 overflow-hidden items-center justify-center p-12">
         <div className="absolute inset-0 z-0 bg-gradient-to-br from-slate-900 via-indigo-900 to-violet-900" />
+        <div className="relative z-10 text-white max-w-xs text-center">
+          <BookOpen className="size-16 text-indigo-300 mx-auto mb-6" />
+          <h2 className="text-2xl font-bold mb-3">Join SchoolLib</h2>
+          <p className="text-indigo-200">Access the school library catalog, track your borrowed books, and chat with our AI librarian.</p>
+        </div>
       </div>
     </div>
   )

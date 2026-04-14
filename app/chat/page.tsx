@@ -76,9 +76,9 @@ export default function ChatPage() {
                <div className={`p-4 rounded-2xl max-w-[85%] text-[15px] leading-relaxed shadow-sm ${
                  m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
                }`}>
-                 <ReactMarkdown className="prose prose-sm leading-normal max-w-none prose-p:my-1 prose-a:text-indigo-400" remarkPlugins={[remarkGfm]}>
-                   {m.content}
-                 </ReactMarkdown>
+                  <div className="prose prose-sm leading-normal max-w-none prose-p:my-1 prose-a:text-indigo-400 whitespace-pre-wrap break-words">
+                    {m.content}
+                  </div>
                </div>
              </div>
           ))}
