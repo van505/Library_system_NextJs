@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
@@ -113,6 +113,7 @@ export default function AdminAnnouncementsPage() {
           </DialogTrigger>
           <DialogContent className="rounded-2xl sm:max-w-[500px]">
             <DialogHeader><DialogTitle>{isEditing ? 'Edit Announcement' : 'Broadcast Announcement'}</DialogTitle></DialogHeader>
+            <DialogDescription className="sr-only">Dialog</DialogDescription>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label>Title <span className="text-red-500">*</span></Label>

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase'
@@ -126,6 +126,7 @@ export default function AdminCategoriesPage() {
           <DialogContent className="rounded-2xl sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>{isEditing ? 'Edit Category' : 'Create Category'}</DialogTitle>
+              <DialogDescription className="sr-only">Dialog</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
               <div className="space-y-2">

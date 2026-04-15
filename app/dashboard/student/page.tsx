@@ -86,16 +86,28 @@ export default function StudentDashboard() {
 
       {/* Announcements */}
       {announcements.length > 0 && (
-        <div className="space-y-3">
-          {announcements.map(a => (
-            <div key={a.id} className="bg-white border-l-4 border-l-amber-400 border border-slate-200 rounded-r-xl p-4 shadow-sm flex gap-4">
-              <Bell className="size-5 text-amber-500 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-slate-800">{a.title}</h4>
-                <p className="text-sm text-slate-600 mt-1">{a.content}</p>
+        <div className="space-y-2">
+          {announcements.map((a: any) => {
+            const colors: Record<string, string> = {
+              info: 'border-l-blue-400 bg-blue-50/60',
+              warning: 'border-l-amber-400 bg-amber-50/60',
+              success: 'border-l-emerald-400 bg-emerald-50/60',
+              danger: 'border-l-red-400 bg-red-50/60',
+            }
+            const iconColors: Record<string, string> = {
+              info: 'text-blue-500', warning: 'text-amber-500',
+              success: 'text-emerald-500', danger: 'text-red-500',
+            }
+            return (
+              <div key={a.id} className={`border border-slate-200 border-l-4 rounded-r-xl p-4 shadow-sm flex gap-4 ${colors[a.type] || colors.info}`}>
+                <Bell className={`size-5 shrink-0 mt-0.5 ${iconColors[a.type] || iconColors.info}`} />
+                <div>
+                  <h4 className="font-bold text-slate-800">{a.title}</h4>
+                  <p className="text-sm text-slate-600 mt-1">{a.content}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

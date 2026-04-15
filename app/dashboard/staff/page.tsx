@@ -19,10 +19,11 @@ export default function StaffDashboard() {
   
   // Stats
   const [stats, setStats] = React.useState({ available: 0, borrowed: 0, dueToday: 0, overdue: 0 })
-  
+
   // Activity and Overdue Alerts
   const [recentActivity, setRecentActivity] = React.useState<any[]>([])
   const [overdueAlerts, setOverdueAlerts] = React.useState<any[]>([])
+  const [announcements, setAnnouncements] = React.useState<any[]>([])
 
   // Quick Borrow Widget
   const [studentSearch, setStudentSearch] = React.useState('')
@@ -43,9 +44,10 @@ export default function StaffDashboard() {
     setLoading(true)
     const todayStr = format(new Date(), 'yyyy-MM-dd')
     
-    const [bRes, txRes] = await Promise.all([
+    const [bRes, txRes, aRes] = await Promise.all([
       supabase.from('books').select('available_copies'),
-      supabase.from('transactions').select('*, books(title, author), profiles(full_name, contact_number, email)').order('borrowed_at', { ascending: false })
+      supabase.from('transactions').select('*, books(title, author), profiles(full_name, contact_number, email)').order('borrowed_at', { ascending: false }),
+      supabase.from('announcements').select('*').eq('is_active', true).order('created_at', { ascending: false })
     ])
 
     const available = bRes.data?.reduce((a, b) => a + (b.available_copies || 0), 0) ?? 0
@@ -64,12 +66,9 @@ export default function StaffDashboard() {
 
     setStats({ available, borrowed, dueToday, overdue })
 
-    // Recent Activity (Mixed processing, e.g. recent records)
     setRecentActivity(allTx.slice(0, 10))
-
-    // Overdue alerts
     setOverdueAlerts(allTx.filter(t => t.status === 'borrowed' && t.due_date && isPast(new Date(t.due_date))))
-
+    setAnnouncements(aRes.data ?? [])
     setLoading(false)
   }
 
@@ -151,6 +150,33 @@ export default function StaffDashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Announcements */}
+      {announcements.length > 0 && (
+        <div className="space-y-2">
+          {announcements.map((a: any) => {
+            const colors: Record<string, string> = {
+              info: 'border-l-blue-400 bg-blue-50/50',
+              warning: 'border-l-amber-400 bg-amber-50/50',
+              success: 'border-l-emerald-400 bg-emerald-50/50',
+              danger: 'border-l-red-400 bg-red-50/50',
+            }
+            const iconColors: Record<string, string> = {
+              info: 'text-blue-500', warning: 'text-amber-500',
+              success: 'text-emerald-500', danger: 'text-red-500',
+            }
+            return (
+              <div key={a.id} className={`border border-slate-200 border-l-4 rounded-r-xl p-4 shadow-sm flex gap-3 ${colors[a.type] || colors.info}`}>
+                <AlertTriangle className={`size-4 shrink-0 mt-0.5 ${iconColors[a.type] || iconColors.info}`} />
+                <div>
+                  <p className="font-bold text-slate-800 text-sm">{a.title}</p>
+                  <p className="text-sm text-slate-600 mt-0.5">{a.content}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Available Books', v: stats.available, icon: BookOpen, c: 'bg-emerald-50 text-emerald-600' },

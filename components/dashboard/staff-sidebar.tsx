@@ -37,8 +37,7 @@ function NavItem({ item, onClick }: { item: NavItemConfig, onClick?: () => void 
     : pathname.startsWith(item.href)
 
   return (
-    <Link
-      href={item.href}
+    <Link prefetch={true} href={item.href}
       onClick={onClick}
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-sm font-medium transition-all group relative',

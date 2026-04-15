@@ -95,27 +95,21 @@ export default function LibbyChatPage() {
         <ScrollArea className="flex-1 p-4 md:p-8">
           <div className="space-y-6 max-w-3xl mx-auto">
             {messages.map((m) => (
-              <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`size-10 rounded-full flex items-center justify-center shrink-0 shadow-sm ${m.role === 'user' ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
-                  {m.role === 'user' ? <User className="size-5 text-white"/> : <Bot className="size-5 text-white"/>}
+              <div key={m.id} className={`flex gap-3 items-end ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                {/* Avatar */}
+                <div className={`size-9 rounded-full flex items-center justify-center shrink-0 shadow-sm ${m.role === 'user' ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
+                  {m.role === 'user' ? <User className="size-4 text-white" /> : <Bot className="size-4 text-white" />}
                 </div>
-                <div className={`flex flex-col w-full max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`px-6 py-4 rounded-[2rem] shadow-sm ${
-                    m.role === 'user' 
-                      ? 'bg-emerald-100/50 border border-emerald-200/50 text-slate-800 rounded-tr-sm' 
-                      : 'bg-white border border-slate-200 text-slate-700 rounded-tl-sm'
+                {/* Bubble */}
+                <div className={`flex flex-col gap-1 max-w-[75%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`px-5 py-3.5 rounded-2xl shadow-sm text-sm break-words whitespace-pre-wrap leading-relaxed ${
+                    m.role === 'user'
+                      ? 'bg-indigo-600 text-white rounded-tr-sm'
+                      : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
                   }`}>
-                    {/* Render newlines */}
-                    {m.content.split('\
-').map((line, i) => (
-                      <React.Fragment key={i}>
-                        {line}
-                        {i !== m.content.split('\
-').length - 1 && <br />}
-                      </React.Fragment>
-                    ))}
+                    {m.content}
                   </div>
-                  <span className="text-[10px] text-slate-400 font-medium uppercase mt-2 px-2">
+                  <span className="text-[10px] text-slate-400 font-medium uppercase px-1">
                     {format(m.timestamp, 'h:mm a')}
                   </span>
                 </div>
@@ -166,8 +160,8 @@ export default function LibbyChatPage() {
              </Button>
            </form>
            <p className="text-center text-[10px] text-slate-400 mt-4 uppercase tracking-widest font-bold">
-             Libby uses Gemini 2.0 AI • Results may vary
-           </p>
+              Libby uses Claude AI • Results may vary
+            </p>
         </div>
       </Card>
     </div>
