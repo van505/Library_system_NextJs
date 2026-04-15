@@ -40,32 +40,32 @@ export default function AdminTransactionsPage() {
   async function loadTransactions() {
     setLoading(true)
     const { data } = await supabase.from('transactions')
-      .select('*, books(title, author, shelves(name, location)), profiles(full_name, student_id, contact_number)')
+      .select('*, books(title, author, shelves(name, location)), profiles!borrower_id(full_name, student_id, contact_number)')
       .order('borrowed_at', { ascending: false })
-    
     setTransactions(data ?? [])
     setLoading(false)
   }
 
   React.useEffect(() => { loadTransactions() }, [supabase])
 
-  // Live Search Effects
+  // Search all profiles by full_name (email is in auth.users, not profiles table)
   React.useEffect(() => {
-    if (studentSearch.length > 2) {
-      supabase.from('profiles').select('id, full_name, student_id, email, contact_number')
-        .eq('role', 'student')
-        .or(`full_name.ilike.%${studentSearch}%,email.ilike.%${studentSearch}%,student_id.ilike.%${studentSearch}%`)
-        .limit(5).then(res => setStudentResults(res.data ?? []))
-    } else setStudentResults([])
+    if (!studentSearch.trim()) { setStudentResults([]); return }
+    supabase.from('profiles')
+      .select('id, full_name, student_id, contact_number, role')
+      .ilike('full_name', `%${studentSearch}%`)
+      .limit(10)
+      .then(({ data }) => setStudentResults(data ?? []))
   }, [studentSearch, supabase])
 
   React.useEffect(() => {
-    if (bookSearch.length > 2) {
-      supabase.from('books').select('id, title, author, available_copies')
-        .gt('available_copies', 0)
-        .or(`title.ilike.%${bookSearch}%,author.ilike.%${bookSearch}%`)
-        .limit(5).then(res => setBookResults(res.data ?? []))
-    } else setBookResults([])
+    if (!bookSearch.trim()) { setBookResults([]); return }
+    supabase.from('books')
+      .select('id, title, author, available_copies')
+      .gt('available_copies', 0)
+      .ilike('title', `%${bookSearch}%`)
+      .limit(8)
+      .then(({ data }) => setBookResults(data ?? []))
   }, [bookSearch, supabase])
 
   function resetBorrow() {
@@ -109,23 +109,30 @@ export default function AdminTransactionsPage() {
     setBorrowing(false)
   }
 
+  // BUG 1 FIX: Use LEAST to cap available_copies at total_copies on return
   async function handleMarkReturned(txId: string, bookId: string, studentId: string | null) {
-    const { error: markErr } = await supabase.from('transactions').update({ status: 'returned', returned_at: new Date().toISOString() }).eq('id', txId)
+    const { error: markErr } = await supabase
+      .from('transactions')
+      .update({ status: 'returned', returned_at: new Date().toISOString() })
+      .eq('id', txId)
     if (!markErr) {
-      // Get current copy count and increment
-      const { data: b } = await supabase.from('books').select('available_copies').eq('id', bookId).single()
-      if (b) await supabase.from('books').update({ available_copies: b.available_copies + 1 }).eq('id', bookId)
-      
+      const { data: b } = await supabase
+        .from('books')
+        .select('available_copies, total_copies')
+        .eq('id', bookId)
+        .single()
+      if (b) {
+        await supabase.from('books')
+          .update({ available_copies: Math.min(b.available_copies + 1, b.total_copies) })
+          .eq('id', bookId)
+      }
       if (studentId) {
         await supabase.from('notifications').insert({
-          user_id: studentId,
-          title: 'Book Returned',
+          user_id: studentId, title: 'Book Returned',
           message: 'Thank you! The book has been marked as returned.',
-          type: 'success',
-          link: '/dashboard/student/borrowed'
+          type: 'success', link: '/dashboard/student/borrowed'
         })
       }
-      
       toast.success('Transaction marked as returned.')
       loadTransactions()
     } else toast.error(markErr.message)
@@ -164,17 +171,22 @@ export default function AdminTransactionsPage() {
                     <Button type="button" variant="ghost" size="sm" onClick={()=>setSelectedStudent(null)}>Change</Button>
                   </div>
                 ) : (
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                    <Input className="pl-9 rounded-xl" placeholder="Type name or email..." value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} />
-                    {studentResults.length > 0 && (
-                      <Card className="absolute top-full left-0 w-full mt-1 z-50 p-1">
-                        {studentResults.map(s => (
-                          <div key={s.id} className="p-2 text-sm hover:bg-slate-100 rounded-lg cursor-pointer flex justify-between" onClick={()=>{setSelectedStudent(s); setStudentSearch('')}}>
-                            <span>{s.full_name}</span><span className="text-slate-400">{s.email}</span>
+                  <div className="space-y-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                      <Input autoComplete="off" className="pl-9 rounded-xl" placeholder="Type any part of name..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} />
+                    </div>
+                    {studentSearch.trim() && (
+                      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                        {studentResults.length === 0 ? (
+                          <p className="text-sm text-slate-400 text-center py-3">No profiles found for &ldquo;{studentSearch}&rdquo;</p>
+                        ) : studentResults.map(s => (
+                          <div key={s.id} className="p-2.5 text-sm hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-100 last:border-0" onClick={() => { setSelectedStudent(s); setStudentSearch('') }}>
+                            <span className="font-medium text-slate-800">{s.full_name}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${ s.role === 'student' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }`}>{s.role}</span>
                           </div>
                         ))}
-                      </Card>
+                      </div>
                     )}
                   </div>
                 )}

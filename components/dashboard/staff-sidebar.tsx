@@ -19,7 +19,7 @@ const staffNav: Record<string, NavItemConfig[]> = {
   LIBRARY: [
     { label: 'Books Catalog', href: '/dashboard/staff/books', icon: BookOpen },
     { label: 'Shelves', href: '/dashboard/staff/shelves', icon: Library },
-    { label: 'Borrow / Return', href: '/dashboard/admin/transactions', icon: ArrowLeftRight },
+    { label: 'Borrow / Return', href: '/dashboard/staff/borrow-return', icon: ArrowLeftRight },
   ],
   TOOLS: [
     { label: 'AI Chat', href: '/dashboard/chat', icon: Bot },

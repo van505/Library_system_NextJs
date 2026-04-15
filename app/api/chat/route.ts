@@ -84,29 +84,31 @@ Guidelines:
 Library Data:
 ${contextData || 'No specific matching books found in the catalog.'}`
 
-    // 6. Call Anthropic Claude
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+    // 6. Call Groq (OpenAI-compatible)
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: latestMessage },
+        ],
         max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: latestMessage }],
+        temperature: 0.7,
       }),
     })
 
-    if (!anthropicRes.ok) {
-      const errData = await anthropicRes.json().catch(() => ({}))
-      throw new Error(errData?.error?.message || `Anthropic API error: ${anthropicRes.status}`)
+    if (!groqRes.ok) {
+      const errData = await groqRes.json().catch(() => ({}))
+      throw new Error(errData?.error?.message || `Groq API error: ${groqRes.status}`)
     }
 
-    const anthropicData = await anthropicRes.json()
-    const replyText = anthropicData.content?.[0]?.text ?? 'Sorry, I could not generate a response.'
+    const groqData = await groqRes.json()
+    const replyText = groqData.choices?.[0]?.message?.content ?? 'Sorry, I could not generate a response.'
 
     return NextResponse.json({ reply: replyText })
 

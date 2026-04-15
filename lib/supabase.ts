@@ -3,9 +3,16 @@ import { createBrowserClient } from '@supabase/ssr'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-/** Call inside 'use client' components */
+// Singleton instance — prevents concurrent auth lock contention
+// that occurs when React Strict Mode double-mounts components
+let _client: ReturnType<typeof createBrowserClient> | null = null
+
+/** Returns the shared Supabase browser client (singleton) */
 export function createClient() {
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  if (!_client) {
+    _client = createBrowserClient(supabaseUrl, supabaseAnonKey)
+  }
+  return _client
 }
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────

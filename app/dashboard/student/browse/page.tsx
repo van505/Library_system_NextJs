@@ -83,18 +83,18 @@ export default function StudentBrowsePage() {
     if (!selectedBook || !myId) return
     setRequesting(true)
 
-    const { error: txError } = await supabase.from('transactions').insert({
+    // BUG 2 FIX: Insert into book_requests (soft hold), NOT transactions
+    // book_id column must exist: ALTER TABLE book_requests ADD COLUMN IF NOT EXISTS book_id uuid REFERENCES books(id);
+    const { error: reqError } = await supabase.from('book_requests').insert({
+      user_id: myId,
       book_id: selectedBook.id,
-      borrower_id: myId,
+      book_title: selectedBook.title,
+      author: selectedBook.author ?? null,
       status: 'pending',
     })
 
-    if (!txError) {
-      await supabase
-        .from('books')
-        .update({ available_copies: selectedBook.available_copies - 1 })
-        .eq('id', selectedBook.id)
-
+    if (!reqError) {
+      // Notify all staff/admin of the new reservation
       const { data: admins } = await supabase
         .from('profiles')
         .select('id')
@@ -104,19 +104,19 @@ export default function StudentBrowsePage() {
         await supabase.from('notifications').insert(
           admins.map(a => ({
             user_id: a.id,
-            title: 'New Borrow Request',
-            message: `A student has requested to borrow "${selectedBook.title}".`,
+            title: 'New Book Reservation 📋',
+            message: `A student has requested to reserve "${selectedBook.title}". Approve in Borrow/Return.`,
             type: 'info',
-            link: '/dashboard/admin/transactions',
+            link: '/dashboard/staff/borrow-return',
           }))
         )
       }
 
-      toast.success('Borrow request submitted!')
+      toast.success('Reservation submitted! Staff will approve and notify you.')
       setIsModalOpen(false)
       loadData()
     } else {
-      toast.error(txError.message)
+      toast.error(reqError.message)
     }
     setRequesting(false)
   }
