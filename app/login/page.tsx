@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { BookOpen } from 'lucide-react'
 
 export default function LoginPage() {
@@ -46,7 +46,7 @@ export default function LoginPage() {
       console.log('[login] profileError:', profileError)
 
       if (profileError || !profile) {
-        // No profile yet — let middleware handle /dashboard root
+        // No profile yet â€” let middleware handle /dashboard root
         toast.success('Welcome!')
         window.location.href = '/dashboard'
         return
@@ -55,13 +55,12 @@ export default function LoginPage() {
       useAuthStore.getState().setProfile({ ...profile, id: data.user.id } as any)
       toast.success('Welcome back!')
 
-      // Use hard navigation so middleware reads fresh session cookie before render
       if (profile.role === 'admin') {
-        window.location.href = '/dashboard/admin'
+        router.push('/dashboard/admin')
       } else if (profile.role === 'staff') {
-        window.location.href = '/dashboard/staff'
+        router.push('/dashboard/staff')
       } else {
-        window.location.href = '/dashboard/student'
+        router.push('/dashboard/student')
       }
     }
     setLoading(false)

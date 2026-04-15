@@ -4,33 +4,15 @@ import * as React from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, BookOpen, Library, Users, ArrowLeftRight,
-  Bot, Search, BookMarked, LogOut, Menu, X, GraduationCap,
-  MessageSquare, Bell, User, ClipboardList
+  LayoutDashboard, BookOpen, Library, ArrowLeftRight,
+  Bot, LogOut, Menu, X, GraduationCap,
+  User
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 type NavItemConfig = { label: string; href: string; icon: React.ElementType }
-
-const adminNav: Record<string, NavItemConfig[]> = {
-  MAIN: [{ label: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard }],
-  LIBRARY: [
-    { label: 'Manage Books', href: '/dashboard/admin/books', icon: BookOpen },
-    { label: 'Manage Shelves', href: '/dashboard/admin/shelves', icon: Library },
-    { label: 'Transactions', href: '/dashboard/admin/transactions', icon: ArrowLeftRight },
-    { label: 'Book Requests', href: '/dashboard/admin/requests', icon: ClipboardList },
-    { label: 'Announcements', href: '/dashboard/admin/announcements', icon: Bell },
-    { label: 'Manage Staff', href: '/dashboard/admin/staff', icon: Users },
-  ],
-  TOOLS: [
-    { label: 'AI Chat', href: '/dashboard/chat', icon: Bot },
-  ],
-  ACCOUNT: [
-    { label: 'Profile', href: '/dashboard/admin/profile', icon: User },
-  ],
-}
 
 const staffNav: Record<string, NavItemConfig[]> = {
   MAIN: [{ label: 'Dashboard', href: '/dashboard/staff', icon: LayoutDashboard }],
@@ -45,28 +27,6 @@ const staffNav: Record<string, NavItemConfig[]> = {
   ACCOUNT: [
     { label: 'Profile', href: '/dashboard/staff/profile', icon: User },
   ],
-}
-
-const studentNav: Record<string, NavItemConfig[]> = {
-  MAIN: [{ label: 'Dashboard', href: '/dashboard/student', icon: LayoutDashboard }],
-  LIBRARY: [
-    { label: 'Browse Books', href: '/dashboard/student/browse', icon: Search },
-    { label: 'My Borrowed Books', href: '/dashboard/student/borrowed', icon: BookMarked },
-    { label: 'Request a Book', href: '/dashboard/student/requests', icon: ClipboardList },
-    { label: 'My Reviews', href: '/dashboard/student/reviews', icon: MessageSquare },
-  ],
-  TOOLS: [
-    { label: 'AI Chat', href: '/dashboard/chat', icon: Bot },
-  ],
-  ACCOUNT: [
-    { label: 'Profile', href: '/dashboard/student/profile', icon: User },
-  ],
-}
-
-function getNavConfig(role: string) {
-  if (role === 'admin') return adminNav
-  if (role === 'staff') return staffNav
-  return studentNav
 }
 
 function NavItem({ item, onClick }: { item: NavItemConfig, onClick?: () => void }) {
@@ -93,11 +53,10 @@ function NavItem({ item, onClick }: { item: NavItemConfig, onClick?: () => void 
   )
 }
 
-function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
-  const { profile } = useAuthStore()
+function SidebarContent({ profile, onNavClick }: { profile: any, onNavClick?: () => void }) {
   const router = useRouter()
   const supabase = createClient()
-  const sections = getNavConfig(profile?.role ?? 'student')
+  const sections = staffNav
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -108,7 +67,6 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
 
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 text-slate-300">
-      {/* Logo */}
       <div className="flex items-center gap-3 px-6 h-16 shrink-0 border-b border-slate-800">
         <div className="size-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-600/20">
           <BookOpen className="size-4 text-white" />
@@ -117,12 +75,11 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
           <p className="font-bold text-white tracking-tight leading-none">SchoolLib</p>
           <p className="text-[10px] text-slate-500 font-medium tracking-wide flex items-center gap-1 mt-0.5">
             <GraduationCap className="size-3 text-indigo-400" />
-            LIBRARY SYSTEM
+            STAFF PANEL
           </p>
         </div>
       </div>
 
-      {/* Nav links */}
       <nav className="flex-1 overflow-y-auto py-4 space-y-5 scrollbar-hide">
         {Object.entries(sections).map(([group, items]) => (
           <div key={group}>
@@ -134,19 +91,18 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
         ))}
       </nav>
 
-      {/* User info + logout */}
       <div className="p-4 border-t border-slate-800 bg-slate-900/50">
         <div className="flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 p-2 rounded-xl transition-colors">
           <div className="size-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0 overflow-hidden">
             {profile?.avatar_url ? (
               <img src={profile.avatar_url} alt="Avatar" className="size-full rounded-full object-cover" />
             ) : (
-              <span className="text-xs font-bold text-indigo-300">{(profile?.full_name ?? 'U').charAt(0).toUpperCase()}</span>
+              <span className="text-xs font-bold text-indigo-300">{(profile?.full_name ?? 'S').charAt(0).toUpperCase()}</span>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-white truncate">{profile?.full_name ?? 'User'}</p>
-            <p className="text-[10px] text-slate-400 capitalize">{profile?.role ?? 'student'}</p>
+            <p className="text-xs font-medium text-white truncate">{profile?.full_name ?? 'Staff'}</p>
+            <p className="text-[10px] text-slate-400 capitalize">{profile?.role ?? 'staff'}</p>
           </div>
           <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Sign Out">
             <LogOut className="size-4" />
@@ -157,17 +113,15 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   )
 }
 
-export default function Sidebar() {
+export default function StaffSidebar({ profile }: { profile: any }) {
   const [mobileOpen, setMobileOpen] = React.useState(false)
 
   return (
     <>
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-64 shrink-0 h-screen sticky top-0 shadow-xl z-20">
-        <SidebarContent />
+        <SidebarContent profile={profile} />
       </aside>
 
-      {/* Mobile hamburger */}
       <div className="lg:hidden fixed top-0 w-full h-16 bg-white border-b border-slate-200 z-30 flex items-center px-4">
         <button
           className="size-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-200"
@@ -176,12 +130,11 @@ export default function Sidebar() {
           <Menu className="size-5" />
         </button>
         <div className="ml-4 flex items-center gap-2">
-          <BookOpen className="size-5 text-indigo-600" />
-          <span className="font-bold text-slate-900">SchoolLib</span>
+           <BookOpen className="size-5 text-indigo-600" />
+           <span className="font-bold text-slate-900">SchoolLib Staff</span>
         </div>
       </div>
 
-      {/* Mobile slide-over */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
@@ -190,7 +143,7 @@ export default function Sidebar() {
               onClick={() => setMobileOpen(false)} aria-label="Close menu">
               <X className="size-5" />
             </button>
-            <SidebarContent onNavClick={() => setMobileOpen(false)} />
+            <SidebarContent profile={profile} onNavClick={() => setMobileOpen(false)} />
           </aside>
         </div>
       )}

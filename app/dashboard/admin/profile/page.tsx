@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { User, Mail, Phone, Lock, Shield, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import type { Profile } from '@/lib/supabase'
 
 export default function AdminProfilePage() {

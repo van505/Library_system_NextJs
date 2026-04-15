@@ -1,101 +1,125 @@
 'use client'
 
 import * as React from 'react'
-import { Check, X, BookOpen, Clock } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase'
-import toast from 'react-hot-toast'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
+import { createClient } from '@/lib/supabase'
+import { toast } from 'sonner'
+import { BookOpen, CheckCircle, XCircle, Search, HelpCircle, LayoutList } from 'lucide-react'
+import { format } from 'date-fns'
 
-export default function RequestsPage() {
+export default function AdminRequestsPage() {
   const supabase = createClient()
   const [requests, setRequests] = React.useState<any[]>([])
   const [loading, setLoading] = React.useState(true)
-  const [filter, setFilter] = React.useState('pending')
+  const [tab, setTab] = React.useState('all') // all, pending, approved, rejected
 
-  React.useEffect(() => { load() }, [])
-
-  async function load() {
+  async function loadRequests() {
     setLoading(true)
-    const { data } = await supabase.from('book_requests').select('*, profiles:user_id(full_name, grade_level)').order('created_at', { ascending: false })
-    setRequests(data || [])
+    const { data } = await supabase.from('book_requests')
+      .select('*, profiles(full_name, student_id, email)')
+      .order('created_at', { ascending: false })
+    
+    setRequests(data ?? [])
     setLoading(false)
   }
 
-  async function handleUpdate(id: string, newStatus: string) {
-    const { error } = await supabase.from('book_requests').update({ status: newStatus }).eq('id', id)
-    if (error) toast.error(error.message)
-    else {
-      toast.success(`Request ${newStatus}`)
-      setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus } : r))
-    }
+  React.useEffect(() => { loadRequests() }, [supabase])
+
+  async function handleRequest(reqId: string, status: 'approved' | 'rejected', userId: string, title: string) {
+    const { error } = await supabase.from('book_requests').update({ status }).eq('id', reqId)
+    if (!error) {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        title: `Book Request ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+        message: `Your request for "${title}" has been ${status}.`,
+        type: status === 'approved' ? 'success' : 'warning',
+        link: '/dashboard/student/requests'
+      })
+      toast.success(`Request ${status}.`)
+      loadRequests()
+    } else toast.error(error.message)
   }
 
-  const filtered = requests.filter(r => r.status === filter)
+  const filtered = requests.filter(r => {
+    if (tab === 'all') return true
+    return r.status === tab
+  })
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto w-full">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Student Requests</h1>
-        <p className="text-sm text-slate-600 mt-1">Manage book borrow/purchase requests</p>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Book Requests</h1>
+          <p className="text-slate-500 text-sm mt-1">Review student requests for books not currently in the catalog.</p>
+        </div>
       </div>
 
-      <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit mb-6">
-        {['pending', 'approved', 'rejected'].map(f => (
-          <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all capitalize ${filter === f ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
-            {f}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="bg-slate-100 rounded-xl p-1 mb-4 border border-slate-200">
+          <TabsTrigger value="all" className="rounded-lg tabular-nums">All Requests</TabsTrigger>
+          <TabsTrigger value="pending" className="rounded-lg tabular-nums bg-amber-50/50 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="rounded-lg tabular-nums">Approved</TabsTrigger>
+          <TabsTrigger value="rejected" className="rounded-lg tabular-nums">Rejected</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold text-xs uppercase tracking-wider">
-              <tr>
-                <th className="p-4">Student</th>
-                <th className="p-4">Book Details</th>
-                <th className="p-4">Date</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {loading ? <tr><td colSpan={4} className="p-8"><Skeleton className="h-20 w-full" /></td></tr> : filtered.length===0 ? <tr><td colSpan={4} className="p-8 text-center text-slate-400">No {filter} requests</td></tr> : filtered.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="p-4">
-                    <p className="font-semibold text-slate-900">{r.profiles?.full_name}</p>
-                    <p className="text-xs text-slate-500">{r.profiles?.grade_level || 'N/A'}</p>
+      <div className="bg-white border text-sm border-slate-200 rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+            <tr>
+              <th className="p-4 font-semibold">Student</th>
+              <th className="p-4 font-semibold">Book Details</th>
+              <th className="p-4 font-semibold">Reason</th>
+              <th className="p-4 font-semibold">Date</th>
+              <th className="p-4 font-semibold">Status / Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              <tr><td colSpan={5} className="p-8 text-center"><Skeleton className="h-4 w-32 mx-auto"/></td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={5} className="p-12 text-center text-slate-500"><LayoutList className="size-10 text-slate-300 mx-auto mb-3" /> No requests found for this filter.</td></tr>
+            ) : filtered.map(r => {
+              const p = r.profiles as any
+              return (
+                <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="p-4 align-top">
+                    <p className="font-bold text-slate-900">{p?.full_name || 'Unknown'}</p>
+                    <p className="text-xs text-slate-500">{p?.student_id || p?.email}</p>
                   </td>
-                  <td className="p-4">
-                    <p className="font-medium text-slate-900 flex items-center gap-1.5"><BookOpen className="size-3 text-slate-400" /> {r.book_title}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{r.author || 'Author unknown'}</p>
-                    {r.reason && <p className="text-xs text-slate-600 bg-slate-100 p-1.5 rounded mt-1.5 italic">"{r.reason}"</p>}
+                  <td className="p-4 align-top">
+                    <p className="font-semibold text-slate-900">{r.book_title}</p>
+                    <p className="text-xs text-slate-500">by {r.author || 'Unknown'}</p>
                   </td>
-                  <td className="p-4 text-xs text-slate-500 flex items-center gap-1 mt-1"><Clock className="size-3" /> {new Date(r.created_at).toLocaleDateString()}</td>
-                  <td className="p-4 text-right">
-                    {r.status === 'pending' && (
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" className="text-xs h-8 border-red-200 text-red-700 hover:bg-red-50 bg-red-50/50" onClick={() => handleUpdate(r.id, 'rejected')}>
-                          <X className="size-3.5 mr-1" /> Reject
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-xs h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-emerald-50/50" onClick={() => handleUpdate(r.id, 'approved')}>
-                          <Check className="size-3.5 mr-1" /> Approve
-                        </Button>
+                  <td className="p-4 align-top max-w-xs">
+                    {r.reason ? <p className="text-sm text-slate-600 line-clamp-2 italic">"{r.reason}"</p> : <span className="text-xs text-slate-400">-</span>}
+                  </td>
+                  <td className="p-4 align-top text-xs text-slate-500">
+                    {format(new Date(r.created_at), 'MMM d, yyyy')}
+                  </td>
+                  <td className="p-4 align-top">
+                    {r.status === 'pending' ? (
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-white" onClick={() => handleRequest(r.id, 'approved', r.user_id, r.book_title)}>Approve</Button>
+                        <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-white" onClick={() => handleRequest(r.id, 'rejected', r.user_id, r.book_title)}>Reject</Button>
                       </div>
-                    )}
-                    {r.status !== 'pending' && (
-                      <span className={`inline-flex px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${r.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                        {r.status}
-                      </span>
+                    ) : (
+                      <Badge variant="outline" className={`border-transparent ${r.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                        {r.status === 'approved' ? <CheckCircle className="size-3 mr-1"/> : <XCircle className="size-3 mr-1"/>}
+                        <span className="capitalize">{r.status}</span>
+                      </Badge>
                     )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

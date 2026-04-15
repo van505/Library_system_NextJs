@@ -1,8 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient, getProfile } from '@/lib/supabase-server'
 import { UserProvider } from '@/components/providers/user-provider'
-import Sidebar from '@/components/dashboard/sidebar'
+import AdminSidebar from '@/components/dashboard/admin-sidebar'
+import StaffSidebar from '@/components/dashboard/staff-sidebar'
+import StudentSidebar from '@/components/dashboard/student-sidebar'
 import { Bell, Search, ChevronRight } from 'lucide-react'
+import { NotificationsPanel } from '@/components/dashboard/notifications-panel'
 
 // Dummy component to fetch unread requests if admin/staff
 async function TopBarRight({ profile }: { profile: any }) {
@@ -25,15 +28,7 @@ async function TopBarRight({ profile }: { profile: any }) {
           className="w-full h-9 pl-9 pr-4 rounded-full bg-slate-100 border-none text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm inset-shadow-sm" 
         />
       </div>
-      <button className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-100">
-        <Bell className="size-5" />
-        {pendingBadge > 0 && (
-          <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-          </span>
-        )}
-      </button>
+      <NotificationsPanel />
       <div className="size-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 border border-indigo-200 shadow-sm hidden md:flex">
         {profile?.avatar_url ? (
            <img src={profile.avatar_url} alt="Avatar" className="size-full rounded-full object-cover" />
@@ -60,7 +55,13 @@ export default async function DashboardLayout({
   return (
     <UserProvider profile={profile}>
       <div className="flex h-screen bg-slate-50 overflow-hidden text-slate-900 font-sans">
-        <Sidebar />
+        {profile?.role === 'admin' ? (
+          <AdminSidebar profile={profile} />
+        ) : profile?.role === 'staff' ? (
+          <StaffSidebar profile={profile} />
+        ) : (
+          <StudentSidebar profile={profile} />
+        )}
         <div className="flex-1 flex flex-col overflow-hidden relative">
           
           {/* Top Bar */}

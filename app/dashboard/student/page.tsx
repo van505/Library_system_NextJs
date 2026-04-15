@@ -1,202 +1,220 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { BookOpen, BookMarked, History, AlertCircle, ChevronRight, Send, CheckCircle, Search } from 'lucide-react'
-import { createClient } from '@/lib/supabase'
-import { useAuthStore } from '@/lib/store'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { format, differenceInDays, isBefore } from 'date-fns'
-import toast from 'react-hot-toast'
+import { createClient } from '@/lib/supabase'
+import { BookOpen, Clock, CheckCircle, AlertTriangle, ArrowRight, Sparkles, MessageSquare, History, Bell, Search } from 'lucide-react'
+import { format, isPast, differenceInDays } from 'date-fns'
+import Link from 'next/link'
 
 export default function StudentDashboard() {
-  const { profile } = useAuthStore()
   const supabase = createClient()
-  const [data, setData] = React.useState<any>(null)
-  const [reqForm, setReqForm] = React.useState({ title: '', author: '', reason: '' })
-  const [savingReq, setSavingReq] = React.useState(false)
+  const [loading, setLoading] = React.useState(true)
+  
+  // Data
+  const [profile, setProfile] = React.useState<any>(null)
+  const [activeTx, setActiveTx] = React.useState<any[]>([])
+  const [stats, setStats] = React.useState({ total: 0, active: 0, returned: 0, overdue: 0 })
+  const [latestBooks, setLatestBooks] = React.useState<any[]>([])
+  const [announcements, setAnnouncements] = React.useState<any[]>([])
 
-  React.useEffect(() => {
-    if (!profile) return
-    async function load() {
-      const [{ data: tData }, { data: bData }] = await Promise.all([
-        supabase.from('transactions').select('*, books(title, cover_url, author)').eq('borrower_id', profile!.id).order('borrowed_at', { ascending: false }),
-        supabase.from('books').select('id, title, author, cover_url, genre').order('created_at', { ascending: false }).limit(6)
-      ])
+  async function loadData() {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
-      const txs = tData || []
-      const active = txs.filter(t => t.status === 'borrowed' || t.status === 'pending')
-      const returned = txs.filter(t => t.status === 'returned')
-      const overdue = active.filter(t => t.due_date && isBefore(new Date(t.due_date), new Date()) && t.status === 'borrowed')
+    const [pRes, txRes, bRes, aRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase.from('transactions').select('*, books(title, author, cover_url, categories(color))').eq('borrower_id', user.id).order('borrowed_at', { ascending: false }),
+      supabase.from('books').select('*, categories(name, color)').order('created_at', { ascending: false }).limit(4),
+      supabase.from('announcements').select('*').eq('is_active', true).order('created_at', { ascending: false })
+    ])
 
-      setData({
-        total: txs.length,
-        active,
-        returned: returned.length,
-        overdue: overdue.length,
-        newBooks: bData || []
-      })
-    }
-    load()
-  }, [profile, supabase])
+    setProfile(pRes.data)
+    
+    const allTx = txRes.data ?? []
+    const active = allTx.filter(t => t.status === 'borrowed')
+    const returned = allTx.length - active.length
+    const overdue = active.filter(t => t.due_date && isPast(new Date(t.due_date))).length
+    
+    setStats({ total: allTx.length, active: active.length, returned, overdue })
+    setActiveTx(active)
+    setLatestBooks(bRes.data ?? [])
+    setAnnouncements(aRes.data ?? [])
 
-  async function submitRequest(e: React.FormEvent) {
-    e.preventDefault()
-    setSavingReq(true)
-    const { error } = await supabase.from('book_requests').insert([{
-      user_id: profile!.id,
-      book_title: reqForm.title,
-      author: reqForm.author,
-      reason: reqForm.reason
-    }])
-    if (error) toast.error(error.message)
-    else {
-      toast.success('Book request submitted!')
-      setReqForm({ title: '', author: '', reason: '' })
-    }
-    setSavingReq(false)
+    setLoading(false)
   }
 
-  if (!data) return (
-    <div className="p-6">
-      <Skeleton className="h-24 rounded-2xl mb-6" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
-      </div>
-      <div className="grid grid-flow-col gap-6">
-        <Skeleton className="h-64 col-span-2 rounded-2xl" />
-        <Skeleton className="h-64 rounded-2xl" />
-      </div>
-    </div>
-  )
+  React.useEffect(() => { loadData() }, [supabase])
 
-  const stats = [
-    { label: 'Books Borrowed', value: data.total, icon: History, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200' },
-    { label: 'Currently Active', value: data.active.length, icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
-    { label: 'Books Returned', value: data.returned, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
-    { label: 'Overdue', value: data.overdue, icon: AlertCircle, color: data.overdue > 0 ? 'text-red-600' : 'text-slate-400', bg: data.overdue > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200' },
-  ]
+  if (loading) return <div className="p-6 space-y-6"><Skeleton className="h-40 rounded-3xl" /><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><Skeleton className="h-32 rounded-2xl"/><Skeleton className="h-32 rounded-2xl"/><Skeleton className="h-32 rounded-2xl"/><Skeleton className="h-32 rounded-2xl"/></div></div>
+
+  const initials = profile?.full_name?.split(' ').map((n:any) => n[0]).join('').substring(0,2).toUpperCase() || 'U'
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto w-full flex flex-col gap-8">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+      
       {/* Welcome Banner */}
-      <div className="bg-indigo-600 rounded-2xl p-6 md:p-8 text-white relative overflow-hidden flex flex-col md:flex-row items-center justify-between shadow-xl shadow-indigo-600/10">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 size-64 bg-violet-500 blur-[80px] rounded-full opacity-50 pointer-events-none" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="bg-white/20 text-indigo-100 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full backdrop-blur-sm">Student</span>
-            {profile?.student_id && <span className="text-indigo-200 text-xs font-mono">{profile.student_id}</span>}
-          </div>
-          <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name?.split(' ')[0]}!</h1>
-          <p className="text-indigo-200 mt-2 max-w-md line-clamp-2">Check your active books or browse the catalog to find your next great read.</p>
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-3xl p-6 md:p-10 text-white shadow-xl shadow-emerald-200 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
+          <BookOpen className="size-64 -rotate-12 translate-x-12 -translate-y-12" />
         </div>
-        <div className="relative z-10 mt-6 md:mt-0 flex gap-4">
-          <Button className="bg-white text-indigo-700 hover:bg-slate-50 rounded-xl" asChild>
-            <Link href="/dashboard/student/browse">Browse Collection</Link>
+        <div className="flex items-center gap-6 relative z-10 w-full md:w-auto">
+           <div className="size-20 rounded-full bg-white/20 border-4 border-white/40 flex items-center justify-center text-2xl font-bold backdrop-blur-sm shrink-0">
+             {initials}
+           </div>
+           <div>
+             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1">Welcome back, {profile?.full_name?.split(' ')[0]}!</h1>
+             <p className="text-emerald-100 flex items-center gap-2">
+                {profile?.student_id && <Badge className="bg-white/20 hover:bg-white/30 text-white border-transparent">ID: {profile.student_id}</Badge>}
+                Ready to explore new worlds today?
+             </p>
+           </div>
+        </div>
+        <div className="flex gap-3 w-full md:w-auto relative z-10 shrink-0">
+          <Button asChild variant="secondary" className="rounded-xl flex-1 md:flex-none text-emerald-700 font-semibold shadow-sm hover:shadow-md transition-all">
+            <Link href="/dashboard/student/browse"><Search className="size-4 mr-2" /> Browse</Link>
+          </Button>
+          <Button asChild className="rounded-xl flex-1 md:flex-none bg-white/20 hover:bg-white/30 border-transparent text-white font-semibold backdrop-blur-sm shadow-none">
+            <Link href="/chat"><Sparkles className="size-4 mr-2" /> Ask Libby AI</Link>
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
-          <div key={i} className={`p-5 rounded-2xl border ${s.bg} flex flex-col gap-2 items-start shadow-sm`}>
-            <div className="flex items-center gap-2">
-              <s.icon className={`size-5 ${s.color}`} />
-              <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">{s.label}</span>
+      {/* Announcements */}
+      {announcements.length > 0 && (
+        <div className="space-y-3">
+          {announcements.map(a => (
+            <div key={a.id} className="bg-white border-l-4 border-l-amber-400 border border-slate-200 rounded-r-xl p-4 shadow-sm flex gap-4">
+              <Bell className="size-5 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-slate-800">{a.title}</h4>
+                <p className="text-sm text-slate-600 mt-1">{a.content}</p>
+              </div>
             </div>
-            <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
-          </div>
+          ))}
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Books Borrowed', v: stats.total, icon: History, c: 'text-blue-600 bg-blue-50 border-blue-100' },
+          { label: 'Currently Active', v: stats.active, icon: BookOpen, c: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+          { label: 'Books Returned', v: stats.returned, icon: CheckCircle, c: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+          { label: 'Overdue Books', v: stats.overdue, icon: AlertTriangle, c: `text-red-600 ${stats.overdue > 0 ? 'bg-red-50 border-red-200 shadow-sm shadow-red-100' : 'bg-slate-50 border-slate-100 text-slate-400'}` }
+        ].map((s,i) => (
+          <Card key={i} className={`border rounded-2xl ${s.c}`}>
+            <CardContent className="p-5">
+              <div className="flex justify-between items-start mb-2">
+                 <div className={`p-2.5 rounded-xl bg-white shadow-sm shrink-0`}>
+                    <s.icon className="size-5" />
+                 </div>
+                 <p className="text-3xl font-bold">{s.v}</p>
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider opacity-80 mt-4">{s.label}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 flex flex-col gap-8">
-          {/* Active Books */}
-          <div>
-            <div className="flex justify-between items-end mb-4">
-              <h2 className="text-xl font-bold text-slate-900">Active Borrowing</h2>
-              <Link href="/dashboard/student/borrowed" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">View all</Link>
+        
+        {/* Currently Borrowed */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-slate-900">Currently Borrowed</h2>
+            <Button asChild variant="link" className="text-emerald-600 hover:text-emerald-700">
+              <Link href="/dashboard/student/borrowed">View All <ArrowRight className="size-4 ml-1"/></Link>
+            </Button>
+          </div>
+          
+          {activeTx.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 border-dashed">
+               <BookOpen className="size-12 text-slate-200 mx-auto mb-3" />
+               <p className="text-slate-500 font-medium">You have no active borrowed books.</p>
+               <Button asChild variant="outline" className="mt-4 rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50">
+                 <Link href="/dashboard/student/browse">Browse Catalog</Link>
+               </Button>
             </div>
+          ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {data.active.length === 0 ? (
-                <div className="col-span-2 p-8 border border-dashed border-slate-300 rounded-2xl text-center flex flex-col items-center">
-                  <BookMarked className="size-8 text-slate-300 mb-3" />
-                  <p className="text-slate-500 font-medium">No active books</p>
-                  <Button variant="link" className="text-indigo-600 h-auto p-0 mt-1" asChild><Link href="/dashboard/student/browse">Find a book</Link></Button>
-                </div>
-              ) : data.active.slice(0, 4).map((tx: any) => {
-                const diff = tx.due_date ? differenceInDays(new Date(tx.due_date), new Date()) : 999
-                const overdue = diff < 0
-                const isPending = tx.status === 'pending'
+              {activeTx.map(t => {
+                const b = t.books as any
+                const daysLeft = t.due_date ? differenceInDays(new Date(t.due_date), new Date()) : 0
+                const overdue = isPast(new Date(t.due_date))
+                
+                let badge = null
+                let ring = 'ring-slate-100'
+                if (overdue) { badge = <Badge className="bg-red-500 hover:bg-red-600">Overdue!</Badge>; ring = 'ring-red-100 shadow-md shadow-red-100 border-red-100' }
+                else if (daysLeft <= 3) { badge = <Badge className="bg-amber-500 hover:bg-amber-600">{daysLeft} days left</Badge>; ring = 'ring-amber-50 border-amber-100' }
+                else badge = <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-transparent shadow-none">{daysLeft} days left</Badge>
+
                 return (
-                  <Card key={tx.id} className="rounded-2xl border-slate-200 overflow-hidden shadow-sm flex group">
-                    <div className="w-20 bg-slate-100 shrink-0 border-r border-slate-100 flex items-center justify-center">
-                       {tx.books?.cover_url ? <img src={tx.books.cover_url} className="w-full h-full object-cover" /> : <BookOpen className="size-6 text-slate-300" />}
+                  <div key={t.id} className={`bg-white p-4 rounded-3xl border border-slate-200 ring-4 transition-all ${ring} flex gap-4`}>
+                    <div className="w-16 h-24 rounded-lg bg-slate-200 overflow-hidden shrink-0 shadow-sm relative">
+                      {b.cover_url ? <img src={b.cover_url} className="w-full h-full object-cover"/> : <div className="w-full h-full" style={{backgroundColor: b.categories?.color || '#cbd5e1'}} />}
                     </div>
-                    <CardContent className="p-4 flex flex-col flex-1">
-                      <h3 className="font-semibold text-slate-900 line-clamp-1 text-sm">{tx.books?.title}</h3>
-                      <p className="text-xs text-slate-500 line-clamp-1">{tx.books?.author}</p>
-                      
-                      <div className="mt-auto pt-3">
-                        {isPending ? (
-                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-200">Pending Request</span>
-                        ) : (
-                          <div className={`text-xs font-semibold ${overdue ? 'text-red-600' : diff <= 3 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {overdue ? 'Overdue!' : `${diff} days left`}
-                            <span className="block text-[10px] font-normal text-slate-400">Due {format(new Date(tx.due_date), 'MMM d')}</span>
-                          </div>
-                        )}
+                    <div className="flex flex-col flex-1 min-w-0 py-1">
+                      <div className="flex justify-between items-start mb-1 gap-2">
+                        <h3 className="font-bold text-slate-900 leading-tight truncate">{b.title}</h3>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <p className="text-xs text-slate-500 truncate">{b.author}</p>
+                      <div className="mt-auto flex items-center justify-between pt-3">
+                         {badge}
+                      </div>
+                    </div>
+                  </div>
                 )
               })}
             </div>
-          </div>
-
-          {/* Newest Additions */}
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Newest Additions</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {data.newBooks.map((b: any) => (
-                <Link key={b.id} href={`/dashboard/student/browse?search=${encodeURIComponent(b.title)}`} className="group">
-                  <div className="aspect-[3/4] bg-slate-100 rounded-xl mb-2 overflow-hidden border border-slate-200 relative">
-                     {b.cover_url ? <img src={b.cover_url} className="w-full h-full object-cover transition-transform group-hover:scale-105" /> : 
-                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center text-4xl font-black text-indigo-900/10 uppercase">{b.title[0]}</div>}
-                  </div>
-                  <h3 className="font-semibold text-slate-900 text-sm line-clamp-1 group-hover:text-indigo-600">{b.title}</h3>
-                  <p className="text-xs text-slate-500 line-clamp-1">{b.author}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-6">
-          <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden bg-gradient-to-b from-indigo-50 to-white">
-            <div className="p-6">
-              <div className="size-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4 border border-indigo-100">
-                <Search className="size-6 text-indigo-600" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">Can't find a book?</h3>
-              <p className="text-sm text-slate-600 mt-2 mb-6">Send a request to the library staff to purchase or locate a book for you.</p>
-              
-              <form onSubmit={submitRequest} className="flex flex-col gap-3">
-                <Input placeholder="Book Title" required value={reqForm.title} onChange={e=>setReqForm({...reqForm, title: e.target.value})} className="bg-white border-slate-200 text-sm h-10 rounded-xl" />
-                <Input placeholder="Author (optional)" value={reqForm.author} onChange={e=>setReqForm({...reqForm, author: e.target.value})} className="bg-white border-slate-200 text-sm h-10 rounded-xl" />
-                <Textarea placeholder="Why do you need it?" value={reqForm.reason} onChange={e=>setReqForm({...reqForm, reason: e.target.value})} className="bg-white border-slate-200 text-sm rounded-xl resize-none h-20" />
-                <Button type="submit" disabled={savingReq || !reqForm.title.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl mt-1">
-                  <Send className="size-4 mr-2" /> Submit Request
-                </Button>
-              </form>
-            </div>
-          </Card>
+        {/* Quick Actions / Side Panel */}
+        <div className="space-y-6">
+           <Card className="rounded-3xl border-slate-200 shadow-sm bg-slate-900 text-white overflow-hidden relative">
+             <div className="absolute -right-6 -top-6 size-32 bg-indigo-500/20 rounded-full blur-2xl"></div>
+             <CardHeader className="pb-3 relative z-10">
+               <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="size-5 text-indigo-400" /> Actions</CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-2 relative z-10">
+               <Button asChild variant="secondary" className="w-full justify-start rounded-xl font-medium bg-white/10 hover:bg-white/20 text-white border-transparent">
+                 <Link href="/dashboard/student/requests"><BookOpen className="size-4 mr-3 opacity-70" /> Request a Book</Link>
+               </Button>
+               <Button asChild variant="secondary" className="w-full justify-start rounded-xl font-medium bg-white/10 hover:bg-white/20 text-white border-transparent">
+                 <Link href="/dashboard/student/reviews"><MessageSquare className="size-4 mr-3 opacity-70" /> Write a Review</Link>
+               </Button>
+             </CardContent>
+           </Card>
+
+           <div>
+             <h2 className="text-lg font-bold text-slate-900 mb-4 px-1">Fresh Arrivals</h2>
+             <div className="space-y-3">
+               {latestBooks.map(b => (
+                 <div key={b.id} className="group bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex gap-3 cursor-pointer">
+                   <div className="w-12 h-16 rounded overflow-hidden shrink-0">
+                     {b.cover_url ? <img src={b.cover_url} className="w-full h-full object-cover"/> : <div className="w-full h-full" style={{backgroundColor: b.categories?.color || '#cbd5e1'}} />}
+                   </div>
+                   <div className="flex-1 min-w-0 py-0.5">
+                     <h4 className="font-bold text-slate-800 text-sm truncate group-hover:text-emerald-600 transition-colors">{b.title}</h4>
+                     <p className="text-xs text-slate-500 truncate">{b.author}</p>
+                     {b.categories && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                           <div className="size-2 rounded-full" style={{backgroundColor: b.categories.color}} />
+                           <span className="text-[10px] text-slate-500 font-medium">{b.categories.name}</span>
+                        </div>
+                     )}
+                   </div>
+                 </div>
+               ))}
+             </div>
+           </div>
         </div>
+
       </div>
     </div>
   )

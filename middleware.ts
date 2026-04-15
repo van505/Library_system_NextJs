@@ -63,8 +63,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(dest)
     }
 
-    // Protect staff routes from non-staff/non-admin
-    if (pathname.startsWith('/dashboard/staff') && role !== 'staff' && role !== 'admin') {
+    // Protect staff routes from non-staff
+    if (pathname.startsWith('/dashboard/staff') && role !== 'staff') {
+      const dest = request.nextUrl.clone()
+      dest.pathname = `/dashboard/${role}`
+      return NextResponse.redirect(dest)
+    }
+
+    // Protect student routes from non-students
+    if (pathname.startsWith('/dashboard/student') && role !== 'student') {
       const dest = request.nextUrl.clone()
       dest.pathname = `/dashboard/${role}`
       return NextResponse.redirect(dest)

@@ -30,6 +30,15 @@ export type Shelf = {
   created_at: string
 }
 
+export type Category = {
+  id: string
+  name: string
+  description: string | null
+  color: string
+  icon: string
+  created_at: string
+}
+
 export type Book = {
   id: string
   title: string
@@ -37,6 +46,7 @@ export type Book = {
   isbn: string | null
   genre: string | null
   shelf_id: string | null
+  category_id?: string | null
   available: boolean
   total_copies: number
   available_copies: number
@@ -46,6 +56,7 @@ export type Book = {
   publisher?: string | null
   created_at: string
   shelves?: { name: string; location: string } | null
+  categories?: { name: string; color: string; icon: string } | null
 }
 
 export type Transaction = {
@@ -57,5 +68,16 @@ export type Transaction = {
   returned_at: string | null
   status: 'pending' | 'borrowed' | 'returned' | 'overdue'
   books?: { title: string; author: string } | null
-  profiles?: { full_name: string | null; student_id: string | null } | null
+  profiles?: { full_name: string | null; student_id: string | null; contact_number: string | null } | null
+}
+
+export type Notification = {
+  id: string
+  user_id: string | null
+  title: string
+  message: string
+  type: 'info' | 'success' | 'warning' | 'danger'
+  is_read: boolean
+  link: string | null
+  created_at: string
 }

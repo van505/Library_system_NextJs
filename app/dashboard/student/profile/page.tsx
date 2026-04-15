@@ -1,213 +1,198 @@
 'use client'
 
 import * as React from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { createClient } from '@/lib/supabase'
-import { useAuthStore } from '@/lib/store'
-import { User, Mail, Lock, GraduationCap, Calendar, BookOpen, Star } from 'lucide-react'
-import { format } from 'date-fns'
-import toast from 'react-hot-toast'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { Profile } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
+import { toast } from 'sonner'
+import { User, Mail, Shield, Phone, CalendarDays, Key, BookOpen, Star, Hash, GraduationCap } from 'lucide-react'
+import { format } from 'date-fns'
 
 export default function StudentProfilePage() {
   const supabase = createClient()
-  const { profile, setProfile } = useAuthStore()
+  const [loading, setLoading] = React.useState(true)
+  const [savingSettings, setSavingSettings] = React.useState(false)
+  const [savingPassword, setSavingPassword] = React.useState(false)
+
+  // Profile data
+  const [profile, setProfile] = React.useState<any>(null)
   const [email, setEmail] = React.useState('')
   const [fullName, setFullName] = React.useState('')
   const [studentId, setStudentId] = React.useState('')
   const [gradeLevel, setGradeLevel] = React.useState('')
   const [contactNumber, setContactNumber] = React.useState('')
+
+  // Stats
+  const [totalBorrowed, setTotalBorrowed] = React.useState(0)
+  const [favoriteGenre, setFavoriteGenre] = React.useState('None yet')
+
+  // Password data
   const [newPassword, setNewPassword] = React.useState('')
   const [confirmPassword, setConfirmPassword] = React.useState('')
-  const [saving, setSaving] = React.useState(false)
-  const [changingPassword, setChangingPassword] = React.useState(false)
-  const [stats, setStats] = React.useState({ totalBorrowed: 0, favoriteGenre: '-' })
-  const [loadingStats, setLoadingStats] = React.useState(true)
 
-  React.useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setEmail(user.email ?? '')
-        // Fetch reading stats
-        const { data: txs } = await supabase
-          .from('transactions')
-          .select('book_id, books(genre)')
-          .eq('borrower_id', user.id)
-        const total = txs?.length ?? 0
-        // Find favorite genre
-        const genreCount: Record<string, number> = {}
-        for (const tx of txs ?? []) {
-          const genre = (tx.books as any)?.genre
-          if (genre) genreCount[genre] = (genreCount[genre] ?? 0) + 1
-        }
-        const fav = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '-'
-        setStats({ totalBorrowed: total, favoriteGenre: fav })
-        setLoadingStats(false)
+  async function loadProfile() {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setEmail(user.email || '')
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (data) {
+        setProfile(data)
+        setFullName(data.full_name || '')
+        setStudentId(data.student_id || '')
+        setGradeLevel(data.grade_level || '')
+        setContactNumber(data.contact_number || '')
       }
-      if (profile) {
-        setFullName(profile.full_name ?? '')
-        setStudentId(profile.student_id ?? '')
-        setGradeLevel(profile.grade_level ?? '')
-        setContactNumber(profile.contact_number ?? '')
+
+      // Load Stats
+      const { data: tx } = await supabase.from('transactions').select('books(category_id, categories(name))').eq('borrower_id', user.id)
+      if (tx) {
+        setTotalBorrowed(tx.length)
+        const genreCounts: Record<string, number> = {}
+        tx.forEach(t => {
+          const g = ((t.books as any)?.categories as any)?.name
+          if (g) genreCounts[g] = (genreCounts[g] || 0) + 1
+        })
+        const match = Object.entries(genreCounts).sort((a,b) => b[1] - a[1])[0]
+        if (match) setFavoriteGenre(match[0])
       }
     }
-    load()
-  }, [profile, supabase])
+    setLoading(false)
+  }
 
-  async function handleSaveProfile(e: React.FormEvent) {
+  React.useEffect(() => { loadProfile() }, [supabase])
+
+  async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
     if (!profile) return
-    setSaving(true)
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName,
-        student_id: studentId || null,
-        grade_level: gradeLevel || null,
-        contact_number: contactNumber || null,
-      })
-      .eq('id', profile.id)
-      .select()
-      .single()
+    setSavingSettings(true)
+    const { error } = await supabase.from('profiles').update({ 
+      full_name: fullName, 
+      contact_number: contactNumber,
+      student_id: studentId,
+      grade_level: gradeLevel
+    }).eq('id', profile.id)
+    
+    setSavingSettings(false)
+    if (error) toast.error(error.message)
+    else { toast.success('Profile updated successfully'); loadProfile() }
+  }
+
+  async function handleUpdatePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return }
+    if (newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return }
+    
+    setSavingPassword(true)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setSavingPassword(false)
+    
     if (error) toast.error(error.message)
     else {
-      setProfile(data as Profile)
-      toast.success('Profile updated!')
+      toast.success('Password updated successfully')
+      setNewPassword(''); setConfirmPassword('')
     }
-    setSaving(false)
   }
 
-  async function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault()
-    if (newPassword !== confirmPassword) { toast.error('Passwords do not match.'); return }
-    if (newPassword.length < 6) { toast.error('Password must be at least 6 characters.'); return }
-    setChangingPassword(true)
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) toast.error(error.message)
-    else { toast.success('Password changed!'); setNewPassword(''); setConfirmPassword('') }
-    setChangingPassword(false)
-  }
+  if (loading) return <div className="p-6"><Skeleton className="h-[400px] max-w-4xl mx-auto rounded-2xl" /></div>
+  if (!profile) return <div className="p-6 text-center text-slate-500">Could not load profile.</div>
 
-  const initials = (profile?.full_name ?? 'U').charAt(0).toUpperCase()
+  const initials = fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U'
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-        <p className="text-slate-500 text-sm mt-1">Manage your student account and personal details.</p>
+    <div className="p-6 max-w-4xl mx-auto space-y-8">
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-6 bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <div className="size-24 md:size-32 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white text-3xl md:text-5xl font-bold shadow-lg shadow-emerald-200 shrink-0 border-4 border-white">
+          {initials}
+        </div>
+        <div className="flex-1 text-center md:text-left space-y-2">
+           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{fullName}</h1>
+           <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+             <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 px-3 py-1 shadow-none tracking-wide"><Shield className="size-3.5 mr-1.5"/> STUDENT</Badge>
+             {profile.student_id && <Badge variant="outline" className="text-slate-600 px-3 py-1 bg-slate-50 border-slate-200"><Hash className="size-3.5 mr-1 text-slate-400"/> ID: {profile.student_id}</Badge>}
+           </div>
+           
+           <div className="flex items-center justify-center md:justify-start gap-6 mt-6 pt-4 border-t border-slate-100">
+             <div>
+               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Total Borrowed</p>
+               <p className="text-2xl font-bold text-slate-900 flex items-center gap-2"><BookOpen className="size-5 text-emerald-500"/> {totalBorrowed}</p>
+             </div>
+             <div className="w-px h-10 bg-slate-200"></div>
+             <div>
+               <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Favorite Genre</p>
+               <p className="text-xl font-bold text-slate-900 flex items-center gap-2 pr-2"><Star className="size-5 text-amber-400 fill-amber-400"/> {favoriteGenre}</p>
+             </div>
+           </div>
+        </div>
       </div>
 
-      {/* Avatar & identity */}
-      <Card className="rounded-2xl border-slate-200 shadow-sm">
-        <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          <div className="size-20 rounded-full bg-gradient-to-br from-emerald-500 to-indigo-600 flex items-center justify-center shadow-lg shrink-0">
-            <span className="text-3xl font-bold text-white">{initials}</span>
-          </div>
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl font-bold text-slate-900">{profile?.full_name ?? 'Student'}</h2>
-              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
-                <GraduationCap className="size-3 mr-1" /> Student
-              </Badge>
-              {profile?.grade_level && <Badge variant="outline" className="text-xs">{profile.grade_level}</Badge>}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-slate-500"><Mail className="size-4" />{email}</div>
-            {profile?.student_id && <div className="text-xs text-slate-400">ID: {profile.student_id}</div>}
-            {profile?.created_at && (
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <Calendar className="size-3.5" /> Member since {format(new Date(profile.created_at), 'MMMM d, yyyy')}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2"><User className="size-5 text-emerald-600" /> Personal Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Full Name</Label>
+                <Input value={fullName} onChange={e=>setFullName(e.target.value)} required className="rounded-xl bg-slate-50 border-slate-200 focus-visible:bg-white transition-colors" />
               </div>
-            )}
-          </div>
-          {/* Reading stats */}
-          <div className="flex gap-4 shrink-0">
-            <div className="text-center">
-              {loadingStats ? <Skeleton className="h-8 w-12 mx-auto rounded-lg" /> : (
-                <p className="text-2xl font-bold text-indigo-600">{stats.totalBorrowed}</p>
-              )}
-              <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5"><BookOpen className="size-3" /> Borrowed</div>
-            </div>
-            <div className="text-center">
-              {loadingStats ? <Skeleton className="h-8 w-16 mx-auto rounded-lg" /> : (
-                <p className="text-sm font-bold text-indigo-600 mt-1">{stats.favoriteGenre}</p>
-              )}
-              <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5"><Star className="size-3" /> Fav Genre</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Student ID</Label>
+                    {/* Readonly if it's already set nicely, else editable */}
+                    <Input value={studentId} onChange={e=>setStudentId(e.target.value)} disabled={!!profile.student_id} className={`rounded-xl bg-slate-50 border-slate-200 transition-colors ${profile.student_id ? 'text-slate-500 cursor-not-allowed opacity-70' : 'focus-visible:bg-white'}`} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Grade Level</Label>
+                    <Input value={gradeLevel} onChange={e=>setGradeLevel(e.target.value)} placeholder="e.g. 10th Grade" className="rounded-xl bg-slate-50 border-slate-200 focus-visible:bg-white transition-colors" />
+                  </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Number</Label>
+                <Input value={contactNumber} onChange={e=>setContactNumber(e.target.value)} placeholder="Parent or personal number" className="rounded-xl bg-slate-50 border-slate-200 focus-visible:bg-white transition-colors" />
+              </div>
+              <div className="space-y-2">
+                <Label>School Email <span className="text-slate-400 text-xs font-normal">(Read-only)</span></Label>
+                <Input value={email} readOnly className="rounded-xl bg-slate-100 border-transparent text-slate-500 cursor-not-allowed" />
+              </div>
+              <Button type="submit" disabled={savingSettings} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white mt-2 shadow-sm shadow-emerald-200">
+                {savingSettings ? 'Saving...' : 'Save Profile'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
-      {/* Edit profile */}
-      <Card className="rounded-2xl border-slate-200 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2"><User className="size-4 text-indigo-600" /> Personal Information</CardTitle>
-          <CardDescription>Keep your details up to date.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2"><Key className="size-5 text-emerald-600" /> Security</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" className="rounded-xl" value={fullName} onChange={e => setFullName(e.target.value)} />
+                <Label>New Password</Label>
+                <Input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} required minLength={6} className="rounded-xl bg-slate-50 border-slate-200 focus-visible:bg-white transition-colors" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contact">Contact Number</Label>
-                <Input id="contact" type="tel" className="rounded-xl" placeholder="+63 912 345 6789" value={contactNumber} onChange={e => setContactNumber(e.target.value)} />
+                <Label>Confirm New Password</Label>
+                <Input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required minLength={6} className="rounded-xl bg-slate-50 border-slate-200 focus-visible:bg-white transition-colors" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="studentId">Student ID</Label>
-                <Input id="studentId" className="rounded-xl" placeholder="STU-0001" value={studentId} onChange={e => setStudentId(e.target.value)} />
+              <div className="pt-2">
+                <p className="text-xs text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  You will be logged out of other devices after changing your password. Keep your password safe and don't share it with other students.
+                </p>
+                <Button type="submit" disabled={savingPassword} className="w-full rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-emerald-700 shadow-sm">
+                  {savingPassword ? 'Updating...' : 'Update Password'}
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="gradeLevel">Grade Level</Label>
-                <Input id="gradeLevel" className="rounded-xl" placeholder="e.g. Grade 10" value={gradeLevel} onChange={e => setGradeLevel(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Email Address</Label>
-                <Input value={email} disabled className="rounded-xl bg-slate-50 text-slate-400" />
-              </div>
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <Input value="Student" disabled className="rounded-xl bg-slate-50 text-slate-400" />
-              </div>
-            </div>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl" disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Change password */}
-      <Card className="rounded-2xl border-slate-200 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2"><Lock className="size-4 text-indigo-600" /> Change Password</CardTitle>
-          <CardDescription>Update your password regularly for security.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="newPass">New Password</Label>
-                <Input id="newPass" type="password" className="rounded-xl" minLength={6} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPass">Confirm Password</Label>
-                <Input id="confirmPass" type="password" className="rounded-xl" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
-              </div>
-            </div>
-            <Button type="submit" variant="outline" className="rounded-xl border-slate-200" disabled={changingPassword || !newPassword}>
-              {changingPassword ? 'Updating...' : 'Update Password'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

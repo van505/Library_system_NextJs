@@ -1,159 +1,175 @@
 'use client'
 
 import * as React from 'react'
-import { Send, Bot, User, Sparkles, BookOpen } from 'lucide-react'
-import { useProfile } from '@/components/providers/user-provider'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Bot, Send, User, Trash2, Library, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
+import { format } from 'date-fns'
 
-type Message = { id: string; role: 'user' | 'assistant'; content: string; timestamp: Date }
-
-const SUGGESTIONS = [
-  'Where is Harry Potter?',
-  'What Science books do you have?',
-  'Show me available Fiction books',
-  'Who has borrowed Romeo and Juliet?',
-]
-
-function TypingDots() {
-  return (
-    <div className="flex gap-1 px-1 py-0.5" aria-label="AI is typing">
-      {[0, 1, 2].map(i => (
-        <span key={i} className="size-1.5 rounded-full bg-current opacity-60 animate-bounce"
-          style={{ animationDelay: `${i * 150}ms`, animationDuration: '900ms' }} />
-      ))}
-    </div>
-  )
+type Message = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: Date
 }
 
-function Bubble({ message }: { message: Message }) {
-  const isUser = message.role === 'user'
-  return (
-    <div className={cn('flex gap-2.5 items-end', isUser ? 'flex-row-reverse' : 'flex-row')}>
-      <div className={cn('size-7 rounded-full flex items-center justify-center shrink-0 mb-0.5',
-        isUser ? 'bg-primary text-primary-foreground' : 'bg-[#1e2a45] text-slate-300 ring-1 ring-white/10')}>
-        {isUser ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
-      </div>
-      <div className={cn('max-w-[72%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
-        isUser
-          ? 'bg-primary text-primary-foreground rounded-br-sm'
-          : 'bg-[#1e2a45] text-slate-100 ring-1 ring-white/10 rounded-bl-sm')}>
-        {message.content.split('\n').map((line, i, arr) => (
-          <React.Fragment key={i}>{line}{i < arr.length - 1 && <br />}</React.Fragment>
-        ))}
-        <p className={cn('text-[10px] mt-1.5 select-none',
-          isUser ? 'text-primary-foreground/60 text-right' : 'text-slate-500')}>
-          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-export default function DashboardChatPage() {
-  const profile = useProfile()
-  const [messages, setMessages] = React.useState<Message[]>([{
-    id: 'welcome',
-    role: 'assistant',
-    content: `Hi! I'm Libby, your AI library assistant 📚\n\nAsk me where any book is located, its availability, or who currently has it borrowed${profile?.role !== 'student' ? ' (admin/staff view)' : ''}.`,
-    timestamp: new Date(),
-  }])
+export default function LibbyChatPage() {
+  const [messages, setMessages] = React.useState<Message[]>([
+    {
+      id: 'init',
+      role: 'assistant',
+      content: 'Hi there! I am Libby, your AI library assistant. How can I help you find your next great read today?',
+      timestamp: new Date()
+    }
+  ])
   const [input, setInput] = React.useState('')
   const [loading, setLoading] = React.useState(false)
   const bottomRef = React.useRef<HTMLDivElement>(null)
-  const inputRef = React.useRef<HTMLInputElement>(null)
 
-  React.useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+  const chips = [
+    "Where is Harry Potter?",
+    "Do you have Science books?",
+    "What's available today?",
+    "Suggest a fantasy book"
+  ]
 
-  async function sendMessage(text: string) {
-    const trimmed = text.trim()
-    if (!trimmed || loading) return
-    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: trimmed, timestamp: new Date() }
+  // Auto scroll to bottom
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  async function handleSend(text: string) {
+    if (!text.trim()) return
+    
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setLoading(true)
+
     try {
+      // Send entire history but format according to the API we just wrote
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })) })
       })
+
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: data.reply, timestamp: new Date() }])
-    } catch (err) {
-      setMessages(prev => [...prev, {
-        id: crypto.randomUUID(), role: 'assistant',
-        content: err instanceof Error ? `Sorry: ${err.message}` : 'Something went wrong. Please try again.',
-        timestamp: new Date(),
-      }])
+      if (!res.ok) throw new Error(data.error || 'Failed to communicate with Libby')
+      
+      const botMsg: Message = { id: (Date.now()+1).toString(), role: 'assistant', content: data.reply, timestamp: new Date() }
+      setMessages(prev => [...prev, botMsg])
+
+    } catch (err: any) {
+      toast.error(err.message)
     } finally {
       setLoading(false)
-      setTimeout(() => inputRef.current?.focus(), 80)
     }
   }
 
+  function handleClear() {
+    setMessages([{ id: Date.now().toString(), role: 'assistant', content: 'Chat history cleared. How can I help you anew?', timestamp: new Date() }])
+  }
+
   return (
-    <div className="flex flex-col h-full bg-[#0f172a]">
-      {/* Header */}
-      <div className="border-b border-white/10 px-5 h-14 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="size-8 rounded-lg bg-primary/20 flex items-center justify-center">
-            <BookOpen className="size-4 text-primary-foreground" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">Libby</p>
-            <p className="text-xs text-slate-400">AI Library Assistant</p>
-          </div>
-        </div>
-        <Badge variant="outline" className="border-white/20 text-slate-400 text-xs gap-1">
-          <Sparkles className="size-3" />AI Powered
-        </Badge>
+    <div className="max-w-4xl mx-auto h-[calc(100vh-6rem)] min-h-[600px] flex flex-col p-4 md:p-6">
+      <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm shrink-0">
+         <div className="flex items-center gap-4">
+           <div className="size-12 rounded-full bg-indigo-50 border-2 border-indigo-100 flex items-center justify-center">
+             <Bot className="size-6 text-indigo-600" />
+           </div>
+           <div>
+             <h1 className="font-bold text-slate-900 text-xl flex items-center gap-1.5"><Sparkles className="size-4 text-amber-400 fill-amber-400" /> Libby AI</h1>
+             <p className="text-xs text-slate-500 font-medium tracking-wide">YOUR PERSONAL LIBRARY ASSISTANT</p>
+           </div>
+         </div>
+         <Button variant="ghost" size="sm" onClick={handleClear} className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl px-3 h-10">
+           <Trash2 className="size-4 mr-2" /> Clear UI
+         </Button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-4">
-        {messages.map(msg => <Bubble key={msg.id} message={msg} />)}
-        {loading && (
-          <div className="flex gap-2.5 items-end">
-            <div className="size-7 rounded-full bg-[#1e2a45] ring-1 ring-white/10 flex items-center justify-center shrink-0">
-              <Bot className="size-3.5 text-slate-300" />
-            </div>
-            <div className="bg-[#1e2a45] ring-1 ring-white/10 rounded-2xl rounded-bl-sm px-4 py-3 text-slate-300">
-              <TypingDots />
-            </div>
-          </div>
-        )}
-        {messages.length === 1 && !loading && (
-          <div className="flex flex-wrap gap-2 mt-1">
-            {SUGGESTIONS.map(s => (
-              <button key={s} onClick={() => sendMessage(s)}
-                className="text-xs border border-white/15 rounded-full px-3 py-1.5 text-slate-400 hover:text-white hover:border-white/30 transition-colors">
-                {s}
-              </button>
+      <Card className="flex-1 rounded-[2rem] border-slate-200 shadow-sm flex flex-col overflow-hidden bg-slate-50/50">
+        <ScrollArea className="flex-1 p-4 md:p-8">
+          <div className="space-y-6 max-w-3xl mx-auto">
+            {messages.map((m) => (
+              <div key={m.id} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div className={`size-10 rounded-full flex items-center justify-center shrink-0 shadow-sm ${m.role === 'user' ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
+                  {m.role === 'user' ? <User className="size-5 text-white"/> : <Bot className="size-5 text-white"/>}
+                </div>
+                <div className={`flex flex-col w-full max-w-[80%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`px-6 py-4 rounded-[2rem] shadow-sm ${
+                    m.role === 'user' 
+                      ? 'bg-emerald-100/50 border border-emerald-200/50 text-slate-800 rounded-tr-sm' 
+                      : 'bg-white border border-slate-200 text-slate-700 rounded-tl-sm'
+                  }`}>
+                    {/* Render newlines */}
+                    {m.content.split('\
+').map((line, i) => (
+                      <React.Fragment key={i}>
+                        {line}
+                        {i !== m.content.split('\
+').length - 1 && <br />}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase mt-2 px-2">
+                    {format(m.timestamp, 'h:mm a')}
+                  </span>
+                </div>
+              </div>
             ))}
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
 
-      {/* Input */}
-      <div className="border-t border-white/10 px-4 py-3 shrink-0 bg-[#0f172a]">
-        <form onSubmit={e => { e.preventDefault(); sendMessage(input) }} className="flex gap-2 items-center">
-          <Input
-            id="chat-input" ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
-            placeholder="Ask about any book…" disabled={loading}
-            className="flex-1 h-11 rounded-xl text-sm bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus-visible:border-primary" autoFocus />
-          <Button type="submit" size="icon" disabled={loading || !input.trim()} className="size-11 rounded-xl shrink-0">
-            <Send className="size-4" />
-          </Button>
-        </form>
-        <p className="text-[10px] text-slate-600 text-center mt-2">
-          Responses based on live library catalog
-        </p>
-      </div>
+            {loading && (
+              <div className="flex gap-4">
+                <div className="size-10 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+                  <Bot className="size-5 text-white"/>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-[2rem] rounded-tl-sm px-6 py-5 shadow-sm flex items-center gap-1.5 h-[58px]">
+                   <span className="size-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                   <span className="size-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                   <span className="size-2 bg-indigo-400 rounded-full animate-bounce"></span>
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} className="h-4" />
+          </div>
+        </ScrollArea>
+
+        <div className="p-4 bg-white border-t border-slate-100 shrink-0">
+           <div className="max-w-3xl mx-auto flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide shrink-0">
+             {chips.map((c, i) => (
+               <Button key={i} variant="outline" size="sm" onClick={() => handleSend(c)} disabled={loading} className="rounded-full bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 shadow-sm whitespace-nowrap">
+                 {c}
+               </Button>
+             ))}
+           </div>
+           <form 
+             className="max-w-3xl mx-auto relative flex items-center" 
+             onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
+           >
+             <Input 
+               value={input} 
+               onChange={e => setInput(e.target.value)} 
+               placeholder="Ask Libby anything about the library..." 
+               disabled={loading}
+               className="h-16 pl-6 pr-16 rounded-full bg-slate-50 border-slate-200 shadow-inner text-base focus-visible:ring-indigo-500" 
+             />
+             <Button 
+               type="submit" 
+               disabled={loading || !input.trim()} 
+               className="absolute right-2 size-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md p-0"
+             >
+               <Send className="size-5 ml-1" />
+             </Button>
+           </form>
+           <p className="text-center text-[10px] text-slate-400 mt-4 uppercase tracking-widest font-bold">
+             Libby uses Gemini 2.0 AI • Results may vary
+           </p>
+        </div>
+      </Card>
     </div>
   )
 }

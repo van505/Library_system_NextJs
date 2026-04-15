@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { ClipboardList, Send, Clock, CheckCircle, XCircle, BookOpen } from 'lucide-react'
 import { format } from 'date-fns'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 type BookRequest = {
   id: string

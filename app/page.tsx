@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/lib/store'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import type { Book, Profile } from '@/lib/supabase'
 
 type BookWithShelf = Book & { shelves?: { name: string; location: string } | null }
@@ -88,7 +88,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
-      {/* ── Section 1: Hero ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Section 1: Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="relative pt-24 pb-32 px-4 flex flex-col items-center justify-center text-white overflow-hidden min-h-[90vh]">
         <div className="absolute inset-0 z-0 bg-gradient-to-br from-indigo-900 via-violet-900 to-slate-900" />
         <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(to right, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
@@ -155,7 +155,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Section 3: Announcements (Moved up if active) ─────────────── */}
+      {/* â”€â”€ Section 3: Announcements (Moved up if active) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {announcements.length > 0 && (
         <section className="bg-white border-b border-slate-200 py-6 px-4">
           <div className="max-w-6xl mx-auto flex flex-col gap-3">
@@ -177,7 +177,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ── Section 2: Featured Books ────────────────────────────────── */}
+      {/* â”€â”€ Section 2: Featured Books â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="py-20 px-4 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-slate-900">Browse Our Collection</h2>
@@ -232,7 +232,7 @@ export default function HomePage() {
                   </div>
                   {b.shelves && (
                     <p className="text-xs text-slate-400 mt-2 line-clamp-1">
-                      📍 {b.shelves.name} - {b.shelves.location}
+                      ðŸ“ {b.shelves.name} - {b.shelves.location}
                     </p>
                   )}
                   <div className="mt-auto pt-4 flex gap-2">
@@ -252,7 +252,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Section 4: AI Chat Preview ───────────────────────────────── */}
+      {/* â”€â”€ Section 4: AI Chat Preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="bg-indigo-900 py-24 px-4 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 size-96 bg-violet-600 blur-[120px] rounded-full opacity-50 pointer-events-none" />
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-12 relative z-10">
@@ -310,7 +310,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Section 5: How it works ──────────────────────────────────── */}
+      {/* â”€â”€ Section 5: How it works â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="bg-slate-50 py-24 px-4">
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl font-bold text-slate-900 mb-12">How SchoolLib Works</h2>
@@ -332,7 +332,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Section 6: Footer ────────────────────────────────────────── */}
+      {/* â”€â”€ Section 6: Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <footer className="bg-white border-t border-slate-200 py-12 px-4">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
@@ -349,7 +349,7 @@ export default function HomePage() {
           </Badge>
         </div>
         <div className="max-w-6xl mx-auto mt-8 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} School Library System. All rights reserved.
+          Â© {new Date().getFullYear()} School Library System. All rights reserved.
         </div>
       </footer>
     </div>

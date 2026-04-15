@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { BookOpen } from 'lucide-react'
 
 export default function RegisterPage() {
@@ -56,7 +56,7 @@ export default function RegisterPage() {
       })
 
       if (profileError) {
-        // Trigger will handle it — just warn, still redirect
+        // Trigger will handle it â€” just warn, still redirect
         toast.error('Profile setup had a minor issue; please update it from your dashboard.')
       } else {
         toast.success('Account created! Please sign in.')
