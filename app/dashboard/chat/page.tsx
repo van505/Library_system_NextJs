@@ -78,8 +78,8 @@ export default function LibbyChatPage() {
     <div className="max-w-4xl mx-auto h-[calc(100vh-6rem)] min-h-[600px] flex flex-col p-4 md:p-6">
       <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm shrink-0">
          <div className="flex items-center gap-4">
-           <div className="size-12 rounded-full bg-indigo-50 border-2 border-indigo-100 flex items-center justify-center">
-             <Bot className="size-6 text-indigo-600" />
+           <div className="size-12 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
+             <Bot className="size-6 text-primary" />
            </div>
            <div>
              <h1 className="font-bold text-slate-900 text-xl flex items-center gap-1.5"><Sparkles className="size-4 text-amber-400 fill-amber-400" /> Libby AI</h1>
@@ -97,14 +97,14 @@ export default function LibbyChatPage() {
             {messages.map((m) => (
               <div key={m.id} className={`flex gap-3 items-end ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 {/* Avatar */}
-                <div className={`size-9 rounded-full flex items-center justify-center shrink-0 shadow-sm ${m.role === 'user' ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
-                  {m.role === 'user' ? <User className="size-4 text-white" /> : <Bot className="size-4 text-white" />}
+                <div className={`size-9 rounded-full flex items-center justify-center shrink-0 shadow-sm ${m.role === 'user' ? 'bg-emerald-600' : 'bg-primary'}`}>
+                  {m.role === 'user' ? <User className="size-4 text-white" /> : <Bot className="size-4 text-primary-foreground" />}
                 </div>
                 {/* Bubble */}
                 <div className={`flex flex-col gap-1 max-w-[75%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div className={`px-5 py-3.5 rounded-2xl shadow-sm text-sm break-words whitespace-pre-wrap leading-relaxed ${
                     m.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-sm'
+                      ? 'bg-primary text-primary-foreground rounded-tr-sm'
                       : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
                   }`}>
                     {m.content}
@@ -118,13 +118,13 @@ export default function LibbyChatPage() {
 
             {loading && (
               <div className="flex gap-4">
-                <div className="size-10 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
-                  <Bot className="size-5 text-white"/>
+                <div className="size-10 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm">
+                  <Bot className="size-5 text-primary-foreground"/>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-[2rem] rounded-tl-sm px-6 py-5 shadow-sm flex items-center gap-1.5 h-[58px]">
-                   <span className="size-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                   <span className="size-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                   <span className="size-2 bg-indigo-400 rounded-full animate-bounce"></span>
+                   <span className="size-2 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                   <span className="size-2 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                   <span className="size-2 bg-primary/60 rounded-full animate-bounce"></span>
                 </div>
               </div>
             )}
@@ -135,7 +135,7 @@ export default function LibbyChatPage() {
         <div className="p-4 bg-white border-t border-slate-100 shrink-0">
            <div className="max-w-3xl mx-auto flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide shrink-0">
              {chips.map((c, i) => (
-               <Button key={i} variant="outline" size="sm" onClick={() => handleSend(c)} disabled={loading} className="rounded-full bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 shadow-sm whitespace-nowrap">
+               <Button key={i} variant="outline" size="sm" onClick={() => handleSend(c)} disabled={loading} className="rounded-full bg-white text-primary border-primary/20 hover:bg-primary/10 shadow-sm whitespace-nowrap">
                  {c}
                </Button>
              ))}

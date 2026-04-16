@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { BookOpen, Search, ArrowRightLeft, Clock, AlertTriangle, ArrowUpRight, ArrowDownRight, Phone } from 'lucide-react'
 import { format, isPast, addDays, getMonth, getDate, differenceInDays } from 'date-fns'
+import { toInputDate, getMinReturnDate, getMaxReturnDate, validateReturnDate } from '@/lib/dateUtils'
 
 export default function StaffDashboard() {
   const supabase = createClient()
@@ -128,6 +129,8 @@ export default function StaffDashboard() {
 
   async function handleBorrow() {
     if (!selectedBook || !selectedStudent) return
+    const err = validateReturnDate(dueDate)
+    if (err) { toast.error(err); return }
     setProcessing(true)
     const { error: txErr } = await supabase.from('transactions').insert({
       book_id: selectedBook.id, borrower_id: selectedStudent.id, due_date: dueDate, status: 'borrowed', borrowed_at: new Date().toISOString()
@@ -169,7 +172,22 @@ export default function StaffDashboard() {
   if (loading) return <div className="p-6"><Skeleton className="h-[200px] rounded-2xl" /></div>
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
+
+      {/* Hero Banner */}
+      <div className="bg-slate-900 rounded-3xl p-6 md:p-10 text-white shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 z-0"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary opacity-20 blur-3xl rounded-full translate-x-1/3 -translate-y-1/3 z-0 transition-transform duration-1000 group-hover:scale-110"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary opacity-10 blur-3xl rounded-full -translate-x-1/2 translate-y-1/2 z-0"></div>
+        <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none z-0">
+          <BookOpen className="size-64 -rotate-12 translate-x-12 -translate-y-12" />
+        </div>
+        <div className="relative z-10 w-full md:w-auto">
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2 opacity-95">Staff Command Center</h1>
+          <p className="text-slate-300 font-medium">Manage borrowing, returns, and track library records seamlessly.</p>
+        </div>
+      </div>
+
       {/* Announcements */}
       {announcements.length > 0 && (
         <div className="space-y-2">
@@ -200,11 +218,11 @@ export default function StaffDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Available Books', v: stats.available, icon: BookOpen, c: 'bg-emerald-50 text-emerald-600' },
-          { label: 'Currently Borrowed', v: stats.borrowed, icon: ArrowRightLeft, c: 'bg-indigo-50 text-indigo-600' },
+          { label: 'Currently Borrowed', v: stats.borrowed, icon: ArrowRightLeft, c: 'bg-primary/10 text-primary' },
           { label: 'Due Today', v: stats.dueToday, icon: Clock, c: 'bg-amber-50 text-amber-600' },
           { label: 'Overdue', v: stats.overdue, icon: AlertTriangle, c: 'bg-red-50 text-red-600' }
         ].map((s,i) => (
-          <Card key={i} className="rounded-2xl shadow-sm border-slate-200">
+          <Card key={i} className="rounded-2xl shadow-sm border-slate-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed mb-1">{s.label}</p>
@@ -219,16 +237,16 @@ export default function StaffDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 flex flex-col gap-6">
           <Card className="rounded-2xl overflow-hidden border border-slate-200 shadow-md">
-            <CardHeader className="bg-indigo-600 text-white rounded-t-none border-b-0 py-3.5 px-5">
+            <CardHeader className="bg-primary text-primary-foreground rounded-t-none border-b-0 py-3.5 px-5">
               <CardTitle className="flex items-center gap-2 text-base"><ArrowRightLeft className="size-4" /> Quick Action Flow</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Tabs defaultValue="borrow" className="w-full">
-                <TabsList className="w-full rounded-none h-12 bg-indigo-50 p-0 overflow-hidden text-indigo-800 border-b border-indigo-100 grid grid-cols-2">
-                   <TabsTrigger value="borrow" className="rounded-none data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:font-bold data-[state=active]:shadow-none h-full border-r border-indigo-100/50 m-0">
+                <TabsList className="w-full rounded-none h-12 bg-primary/5 p-0 overflow-hidden text-primary border-b border-primary/10 grid grid-cols-2">
+                   <TabsTrigger value="borrow" className="rounded-none data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:font-bold data-[state=active]:shadow-none h-full border-r border-primary/10 m-0 transition-transform">
                      <ArrowUpRight className="size-4 mr-2" /> Issue Book
                    </TabsTrigger>
-                   <TabsTrigger value="return" className="rounded-none data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:font-bold data-[state=active]:shadow-none h-full m-0">
+                   <TabsTrigger value="return" className="rounded-none data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:font-bold data-[state=active]:shadow-none h-full m-0 transition-transform">
                      <ArrowDownRight className="size-4 mr-2" /> Return Book
                    </TabsTrigger>
                 </TabsList>
@@ -237,9 +255,9 @@ export default function StaffDashboard() {
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500 uppercase font-bold tracking-wide">Student</Label>
                     {selectedStudent ? (
-                      <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-2.5 rounded-xl text-indigo-800 text-sm font-medium">
+                      <div className="flex items-center justify-between bg-primary/5 border border-primary/20 p-2.5 rounded-xl text-primary text-sm font-medium transition-all">
                         <span className="truncate">{selectedStudent.full_name}</span>
-                        <Button type="button" variant="ghost" size="sm" className="h-6 px-2 hover:bg-indigo-100 bg-white shadow-sm" onClick={() => setSelectedStudent(null)}>Clear</Button>
+                        <Button type="button" variant="ghost" size="sm" className="h-6 px-2 hover:bg-primary/10 bg-white shadow-sm" onClick={() => setSelectedStudent(null)}>Clear</Button>
                       </div>
                     ) : (
                       <div className="space-y-1">
@@ -279,9 +297,9 @@ export default function StaffDashboard() {
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500 uppercase font-bold tracking-wide">Book</Label>
                     {selectedBook ? (
-                       <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 p-2.5 rounded-xl text-indigo-800 text-sm font-medium">
+                      <div className="flex items-center justify-between bg-primary/5 border border-primary/20 p-2.5 rounded-xl text-primary text-sm font-medium transition-all">
                         <span className="truncate">{selectedBook.title}</span>
-                        <Button type="button" variant="ghost" size="sm" className="h-6 px-2 hover:bg-indigo-100 bg-white shadow-sm" onClick={()=>setSelectedBook(null)}>Clear</Button>
+                        <Button type="button" variant="ghost" size="sm" className="h-6 px-2 hover:bg-primary/10 bg-white shadow-sm text-primary" onClick={()=>setSelectedBook(null)}>Clear</Button>
                       </div>
                     ) : (
                       <div className="relative">
@@ -290,7 +308,7 @@ export default function StaffDashboard() {
                         {bookResults.length > 0 && (
                           <Card className="absolute top-full left-0 w-full mt-1 z-50 p-1 shadow-xl border-slate-200">
                             {bookResults.map(b => (
-                               <div key={b.id} className="p-2 text-sm hover:bg-indigo-50 rounded-lg cursor-pointer" onClick={()=>{setSelectedBook(b); setBookSearch('')}}>
+                               <div key={b.id} className="p-2 text-sm hover:bg-primary/5 rounded-lg cursor-pointer transition-colors" onClick={()=>{setSelectedBook(b); setBookSearch('')}}>
                                 <span className="font-semibold text-slate-800">{b.title}</span>
                                 <div className="text-xs text-emerald-600">{b.available_copies} available</div>
                               </div>
@@ -302,9 +320,9 @@ export default function StaffDashboard() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500 uppercase font-bold tracking-wide">Due Date</Label>
-                    <Input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} className="rounded-xl border-slate-200 bg-slate-50" />
+                    <Input type="date" value={dueDate} min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())} onChange={e=>setDueDate(e.target.value)} className="rounded-xl border-slate-200 bg-slate-50" />
                   </div>
-                  <Button disabled={processing || !selectedStudent || !selectedBook} className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold mt-2 py-6 shadow-md shadow-indigo-200" onClick={handleBorrow}>
+                  <Button disabled={processing || !selectedStudent || !selectedBook} className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold mt-2 py-6 shadow-md shadow-primary/20 transition-transform hover:-translate-y-0.5" onClick={handleBorrow}>
                     {processing ? 'Processing...' : 'Confirm Issue'}
                   </Button>
                 </TabsContent>

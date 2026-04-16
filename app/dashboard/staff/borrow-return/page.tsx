@@ -134,6 +134,8 @@ export default function StaffTransactionsPage() {
   async function handleBorrowSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedStudent || !selectedBook) { toast.error('Please select both a student and a book.'); return }
+    const err = validateReturnDate(dueDate)
+    if (err) { toast.error(err); return }
     setBorrowing(true)
 
     const { error: txError } = await supabase.from('transactions').insert({
@@ -366,7 +368,7 @@ export default function StaffTransactionsPage() {
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2" onClick={resetBorrow}>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 transition-transform hover:-translate-y-0.5" onClick={resetBorrow}>
               <Plus className="size-4" /> Issue Book (Walk-in)
             </Button>
           </DialogTrigger>
@@ -392,7 +394,7 @@ export default function StaffTransactionsPage() {
                         {studentResults.length === 0 ? (
                           <p className="text-sm text-slate-400 text-center py-3">No match for &ldquo;{studentSearch}&rdquo;</p>
                         ) : studentResults.map(s => (
-                          <div key={s.id} className="p-2.5 text-sm hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-100 last:border-0" onClick={() => { setSelectedStudent(s); setStudentSearch('') }}>
+                          <div key={s.id} className="p-2.5 text-sm hover:bg-primary/5 cursor-pointer flex items-center justify-between border-b border-slate-100 last:border-0 transition-colors" onClick={() => { setSelectedStudent(s); setStudentSearch('') }}>
                             <span className="font-medium text-slate-800">{s.full_name}</span>
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${s.role === 'student' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{s.role}</span>
                           </div>
@@ -421,7 +423,7 @@ export default function StaffTransactionsPage() {
                         {bookResults.length === 0 ? (
                           <p className="text-sm text-slate-400 text-center py-3">No available books matching &ldquo;{bookSearch}&rdquo;</p>
                         ) : bookResults.map(b => (
-                          <div key={b.id} className="p-2.5 text-sm hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-100 last:border-0" onClick={() => { setSelectedBook(b); setBookSearch('') }}>
+                          <div key={b.id} className="p-2.5 text-sm hover:bg-primary/5 cursor-pointer flex items-center justify-between border-b border-slate-100 last:border-0 transition-colors" onClick={() => { setSelectedBook(b); setBookSearch('') }}>
                             <span className="font-medium text-slate-800">{b.title} <span className="text-slate-500 font-normal">by {b.author}</span></span>
                             <span className="text-emerald-600 bg-emerald-50 text-xs px-2 py-0.5 rounded">{b.available_copies} avail</span>
                           </div>
@@ -435,7 +437,7 @@ export default function StaffTransactionsPage() {
               <div className="space-y-2">
                 <Label>Due Date</Label>
                 <input type="date" required
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                   min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())}
                   value={dueDate} onChange={e => setDueDate(e.target.value)} />
               </div>
@@ -444,7 +446,7 @@ export default function StaffTransactionsPage() {
                 <Textarea value={notes} onChange={e => setNotes(e.target.value)} className="rounded-xl resize-none" rows={2} />
               </div>
 
-              <Button type="submit" disabled={borrowing || !selectedStudent || !selectedBook} className="w-full bg-indigo-600 text-white rounded-xl">
+              <Button type="submit" disabled={borrowing || !selectedStudent || !selectedBook} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-transform hover:-translate-y-0.5">
                 {borrowing ? 'Processing...' : 'Confirm Issuance'}
               </Button>
             </form>

@@ -188,7 +188,7 @@ export default function AdminDashboard() {
           { label: 'Available', val: stats.availableBooks, icon: CheckCircle, c: 'text-emerald-600 bg-emerald-50' },
           { label: 'Borrowed', val: stats.borrowedCount, icon: Clock, c: 'text-amber-600 bg-amber-50' },
           { label: 'Overdue', val: stats.overdueCount, icon: AlertTriangle, c: 'text-red-600 bg-red-50' },
-          { label: 'Total Shelves', val: stats.totalShelves, icon: Library, c: 'text-indigo-600 bg-indigo-50' },
+          { label: 'Total Shelves', val: stats.totalShelves, icon: Library, c: 'text-primary bg-primary/10' },
           { label: 'Students', val: stats.totalStudents, icon: Users, c: 'text-violet-600 bg-violet-50' },
         ].map((s, i) => (
           <Card key={i} className="border-slate-200 shadow-sm rounded-2xl">
@@ -270,8 +270,8 @@ export default function AdminDashboard() {
         </Card>
 
         <Card className="border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-          <CardHeader className="bg-indigo-50/50 border-b border-indigo-100/50">
-            <CardTitle className="text-lg text-indigo-900">Pending Book Requests</CardTitle>
+          <CardHeader className="bg-primary/5 border-b border-primary/10">
+            <CardTitle className="text-lg text-primary">Pending Book Requests</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {pendingReqs.length === 0 ? <div className="p-6 text-sm text-slate-500 text-center">No pending requests.</div> : pendingReqs.map(r => (
@@ -300,7 +300,7 @@ export default function AdminDashboard() {
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Active & Recent</h3>
             <div className="space-y-3">
               {announcements.length === 0 ? <p className="text-sm text-slate-500">No announcements yet.</p> : announcements.map(a => (
-                <div key={a.id} className={`p-4 rounded-xl border ${a.is_active ? 'border-indigo-200 bg-indigo-50/30' : 'border-slate-200 bg-slate-50'}`}>
+                <div key={a.id} className={`p-4 rounded-xl border ${a.is_active ? 'border-primary/20 bg-primary/5' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex justify-between items-start mb-1">
                     <h4 className="font-semibold text-slate-900">{a.title}</h4>
                     <div className="flex items-center gap-2">
@@ -331,14 +331,14 @@ export default function AdminDashboard() {
                 </SelectContent>
               </Select>
               <Textarea placeholder="Message content..." className="rounded-xl resize-none" rows={3} value={newAnnContent} onChange={e => setNewAnnContent(e.target.value)} required />
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-indigo-50/50 transition-colors">
-                <input type="checkbox" checked={newAnnLanding} onChange={e => setNewAnnLanding(e.target.checked)} className="accent-indigo-600 size-4" />
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-primary/10 transition-colors">
+                <input type="checkbox" checked={newAnnLanding} onChange={e => setNewAnnLanding(e.target.checked)} className="accent-primary size-4" />
                 <div>
                   <p className="text-sm font-semibold text-slate-800">Show on Landing Page</p>
                   <p className="text-xs text-slate-500">Visible to public visitors on the homepage</p>
                 </div>
               </label>
-              <Button type="submit" disabled={submittingAnn} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl w-full">Broadcast Announcement</Button>
+              <Button type="submit" disabled={submittingAnn} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl w-full transition-transform hover:-translate-y-0.5">Broadcast Announcement</Button>
             </form>
           </div>
         </CardContent>

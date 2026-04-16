@@ -182,7 +182,7 @@ function CoverImageInput({
         />
       ) : (
         <div
-          className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors"
+          className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-primary/30 hover:bg-primary/5 transition-colors"
           onClick={() => fileRef.current?.click()}
         >
           <input
@@ -432,7 +432,7 @@ export default function StaffBooksPage() {
           )}
           <Dialog open={isOpen} onOpenChange={open => { setIsOpen(open); if (!open) resetForm() }}>
             <DialogTrigger asChild>
-              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 shadow-sm shadow-indigo-600/20" onClick={openCreate}>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5" onClick={openCreate}>
                 <Plus className="size-4" /> Add Book
               </Button>
             </DialogTrigger>
@@ -519,7 +519,7 @@ export default function StaffBooksPage() {
                   />
                 </div>
 
-                <Button type="submit" disabled={saving} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-11">
+                <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-11 transition-transform hover:-translate-y-0.5">
                   {saving ? 'Saving...' : isEditing ? 'Update Book' : 'Add Book'}
                 </Button>
               </form>
@@ -534,9 +534,9 @@ export default function StaffBooksPage() {
           { label: 'Total', value: totalAcc, color: 'text-slate-900' },
           { label: 'Available', value: availAcc, color: 'text-emerald-600' },
           { label: 'Borrowed', value: borrowAcc, color: 'text-amber-600' },
-          { label: 'Categories', value: allCategories.length, color: 'text-indigo-600' },
+          { label: 'Categories', value: allCategories.length, color: 'text-primary' },
         ].map(s => (
-          <div key={s.label} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div key={s.label} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
           </div>

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, Library, ArrowLeftRight,
   Bot, LogOut, Menu, X, GraduationCap,
-  User, Archive
+  User, Archive, UserCircle
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'

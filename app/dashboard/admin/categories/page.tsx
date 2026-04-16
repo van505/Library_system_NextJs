@@ -119,7 +119,7 @@ export default function AdminCategoriesPage() {
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2" onClick={openCreate}>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 transition-transform hover:-translate-y-0.5" onClick={openCreate}>
               <Plus className="size-4" /> Add Category
             </Button>
           </DialogTrigger>
@@ -150,7 +150,7 @@ export default function AdminCategoriesPage() {
                   <Input required value={icon} onChange={e => setIcon(e.target.value)} className="rounded-xl" placeholder="e.g. Rocket" />
                 </div>
               </div>
-              <Button type="submit" disabled={saving} className="w-full bg-indigo-600 text-white rounded-xl mt-2">
+              <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl mt-2 transition-transform hover:-translate-y-0.5">
                 {saving ? 'Saving...' : 'Save Category'}
               </Button>
             </form>
@@ -178,10 +178,10 @@ export default function AdminCategoriesPage() {
           </SelectContent>
         </Select>
         <div className="flex border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-          <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 transition-colors ${viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+          <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-slate-500 hover:bg-slate-50'}`}>
             <LayoutGrid className="size-4" />
           </button>
-          <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 transition-colors ${viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+          <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-slate-500 hover:bg-slate-50'}`}>
             <List className="size-4" />
           </button>
         </div>
@@ -215,7 +215,7 @@ export default function AdminCategoriesPage() {
                     </div>
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-indigo-600" onClick={() => openEdit(c)}><Edit className="size-4"/></Button>
+                    <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-primary" onClick={() => openEdit(c)}><Edit className="size-4"/></Button>
                     <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-red-600" onClick={() => handleDelete(c.id, c.book_count)} disabled={c.book_count > 0}><Trash2 className="size-4"/></Button>
                   </div>
                 </div>
@@ -256,7 +256,7 @@ export default function AdminCategoriesPage() {
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex gap-1 justify-end">
-                      <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-indigo-600" onClick={() => openEdit(c)}><Edit className="size-4"/></Button>
+                      <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-primary" onClick={() => openEdit(c)}><Edit className="size-4"/></Button>
                       <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-red-600" onClick={() => handleDelete(c.id, c.book_count)} disabled={c.book_count > 0}><Trash2 className="size-4"/></Button>
                     </div>
                   </td>

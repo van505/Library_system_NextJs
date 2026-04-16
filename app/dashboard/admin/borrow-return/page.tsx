@@ -184,7 +184,7 @@ export default function AdminBorrowReturnPage() {
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2"><Plus className="size-4" /> Issue Book</Button>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 transition-transform hover:-translate-y-0.5"><Plus className="size-4" /> Issue Book</Button>
           </DialogTrigger>
           <DialogContent className="rounded-2xl sm:max-w-[500px]">
             <DialogHeader><DialogTitle>Issue Book to Student</DialogTitle></DialogHeader>
@@ -200,7 +200,7 @@ export default function AdminBorrowReturnPage() {
                 ) : (
                   <div className="space-y-1">
                     <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" /><Input autoComplete="off" className="pl-9 rounded-xl" placeholder="Search student name..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} /></div>
-                    {studentSearch.trim() && <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">{studentResults.length === 0 ? <p className="text-xs text-slate-400 text-center py-2">No results</p> : studentResults.map(s => <div key={s.id} className="p-2.5 text-sm hover:bg-indigo-50 cursor-pointer border-b border-slate-100 last:border-0" onClick={() => { setSelectedStudent(s); setStudentSearch('') }}>{s.full_name} <span className="text-xs text-slate-400">({s.student_id})</span></div>)}</div>}
+                    {studentSearch.trim() && <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">{studentResults.length === 0 ? <p className="text-xs text-slate-400 text-center py-2">No results</p> : studentResults.map(s => <div key={s.id} className="p-2.5 text-sm hover:bg-primary/5 cursor-pointer border-b border-slate-100 last:border-0" onClick={() => { setSelectedStudent(s); setStudentSearch('') }}>{s.full_name} <span className="text-xs text-slate-400">({s.student_id})</span></div>)}</div>}
                   </div>
                 )}
               </div>
@@ -214,13 +214,13 @@ export default function AdminBorrowReturnPage() {
                 ) : (
                   <div className="space-y-1">
                     <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" /><Input autoComplete="off" className="pl-9 rounded-xl" placeholder="Search book title..." value={bookSearch} onChange={e => setBookSearch(e.target.value)} /></div>
-                    {bookSearch.trim() && <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">{bookResults.length === 0 ? <p className="text-xs text-slate-400 text-center py-2">No available books</p> : bookResults.map(b => <div key={b.id} className="p-2.5 text-sm hover:bg-indigo-50 cursor-pointer border-b border-slate-100 last:border-0" onClick={() => { setSelectedBook(b); setBookSearch('') }}>{b.title} <span className="text-emerald-600 text-xs">({b.available_copies} avail)</span></div>)}</div>}
+                    {bookSearch.trim() && <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">{bookResults.length === 0 ? <p className="text-xs text-slate-400 text-center py-2">No available books</p> : bookResults.map(b => <div key={b.id} className="p-2.5 text-sm hover:bg-primary/5 cursor-pointer border-b border-slate-100 last:border-0" onClick={() => { setSelectedBook(b); setBookSearch('') }}>{b.title} <span className="text-emerald-600 text-xs">({b.available_copies} avail)</span></div>)}</div>}
                   </div>
                 )}
               </div>
-              <div className="space-y-2"><Label>Due Date</Label><input type="date" required className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())} value={dueDate} onChange={e => setDueDate(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Due Date</Label><input type="date" required className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())} value={dueDate} onChange={e => setDueDate(e.target.value)} /></div>
               <div className="space-y-2"><Label>Notes (Optional)</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="rounded-xl resize-none" rows={2} /></div>
-              <Button type="submit" disabled={borrowing || !selectedStudent || !selectedBook} className="w-full bg-indigo-600 text-white rounded-xl">{borrowing ? 'Processing...' : 'Confirm Issuance'}</Button>
+              <Button type="submit" disabled={borrowing || !selectedStudent || !selectedBook} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-transform hover:-translate-y-0.5">{borrowing ? 'Processing...' : 'Confirm Issuance'}</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -260,7 +260,7 @@ export default function AdminBorrowReturnPage() {
                     <tr key={r.id} className="hover:bg-amber-50/30 transition-colors">
                       <td className="p-4 align-top"><p className="font-bold text-slate-900">{p?.full_name || 'Unknown'}</p><p className="text-xs text-slate-500">{p?.student_id}</p></td>
                       <td className="p-4 align-top"><p className="font-semibold text-slate-900">{bk?.title ?? r.book_title}</p><p className="text-xs text-slate-500">{bk?.author ?? r.author}</p></td>
-                      <td className="p-4 align-top text-sm">{r.proposed_return_date ? <span className="font-medium text-indigo-700">{format(new Date(r.proposed_return_date + 'T00:00:00'), 'MMM d, yyyy')}</span> : <span className="text-slate-400 italic text-xs">Not specified</span>}</td>
+                      <td className="p-4 align-top text-sm">{r.proposed_return_date ? <span className="font-medium text-primary">{format(new Date(r.proposed_return_date + 'T00:00:00'), 'MMM d, yyyy')}</span> : <span className="text-slate-400 italic text-xs">Not specified</span>}</td>
                       <td className="p-4 align-top text-xs text-slate-500">{Math.round(hoursOld)}h ago</td>
                       <td className="p-4 text-right align-top space-y-1.5">
                         <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white w-full gap-1" onClick={() => handleApprove(r)}><CheckCircle className="size-3" /> Approve</Button>
@@ -312,7 +312,7 @@ export default function AdminBorrowReturnPage() {
                       </td>
                       <td className="p-4 align-top">{statusEl}</td>
                       <td className="p-4 text-right align-top space-y-1.5">
-                        {t.status === 'borrowed' && <Button size="sm" variant="outline" className="w-full bg-white border-slate-200 text-slate-700 hover:bg-indigo-50" onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>Mark Returned</Button>}
+                        {t.status === 'borrowed' && <Button size="sm" variant="outline" className="w-full bg-white border-slate-200 text-slate-700 hover:bg-primary/5 hover:text-primary" onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>Mark Returned</Button>}
                         {/* Archive & Delete (admin-only) */}
                         <div className="flex gap-1 justify-end">
                           <Button size="sm" variant="ghost" className="text-amber-600 hover:bg-amber-50" onClick={() => setArchiveTarget({ id: t.id, table: 'transactions', label: book?.title ?? 'record' })}><Archive className="size-3" /></Button>
@@ -332,8 +332,8 @@ export default function AdminBorrowReturnPage() {
         <DialogContent className="rounded-2xl sm:max-w-sm">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><CalendarCheck className="size-5 text-amber-600" /> Edit &amp; Approve</DialogTitle><DialogDescription>Adjust return date.</DialogDescription></DialogHeader>
           <div className="space-y-4 pt-1">
-            {editTarget?.proposed_return_date && <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl text-sm text-slate-600">Student proposed: <strong className="text-indigo-700">{format(new Date(editTarget.proposed_return_date + 'T00:00:00'), 'MMM d, yyyy')}</strong></div>}
-            <div className="space-y-2"><Label>New Return Date</Label><input type="date" className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white" min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())} value={editDate} onChange={e => { setEditDate(e.target.value); setEditDateError(validateReturnDate(e.target.value)) }} />{editDateError && <p className="text-xs text-red-600">{editDateError}</p>}</div>
+            {editTarget?.proposed_return_date && <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl text-sm text-slate-600">Student proposed: <strong className="text-primary">{format(new Date(editTarget.proposed_return_date + 'T00:00:00'), 'MMM d, yyyy')}</strong></div>}
+            <div className="space-y-2"><Label>New Return Date</Label><input type="date" className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white" min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())} value={editDate} onChange={e => { setEditDate(e.target.value); setEditDateError(validateReturnDate(e.target.value)) }} />{editDateError && <p className="text-xs text-red-600">{editDateError}</p>}</div>
             <div className="space-y-2"><Label>Note to Student (Optional)</Label><Textarea className="rounded-xl resize-none" rows={2} value={editNote} onChange={e => setEditNote(e.target.value)} /></div>
             <div className="flex gap-2"><Button variant="outline" className="flex-1 rounded-xl" onClick={() => setEditApproveOpen(false)}>Cancel</Button><Button className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white" onClick={handleEditApprove} disabled={editApproving || !!editDateError}>{editApproving ? 'Approving...' : 'Confirm'}</Button></div>
           </div>

@@ -67,13 +67,13 @@ export default function AdminProfilePage() {
       {/* Avatar & identity */}
       <Card className="rounded-2xl border-slate-200 shadow-sm">
         <CardContent className="p-6 flex items-center gap-6">
-          <div className="size-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
-            <span className="text-3xl font-bold text-white">{initials}</span>
+          <div className="size-20 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
+            <span className="text-3xl font-bold text-primary-foreground">{initials}</span>
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-slate-900">{profile?.full_name ?? 'Administrator'}</h2>
-              <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-none">
+              <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none">
                 <Shield className="size-3 mr-1" /> Admin
               </Badge>
             </div>
@@ -92,7 +92,7 @@ export default function AdminProfilePage() {
       {/* Edit profile */}
       <Card className="rounded-2xl border-slate-200 shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2"><User className="size-4 text-indigo-600" /> Personal Information</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2"><User className="size-4 text-primary" /> Personal Information</CardTitle>
           <CardDescription>Update your display name and contact details.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -115,7 +115,7 @@ export default function AdminProfilePage() {
                 <Input value="Administrator" disabled className="rounded-xl bg-slate-50 text-slate-400" />
               </div>
             </div>
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl" disabled={saving}>
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-transform hover:-translate-y-0.5" disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </form>

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, Library, Users, ArrowLeftRight,
   Bot, LogOut, Menu, X, GraduationCap,
-  Bell, User, ClipboardList, Tag, Archive
+  Bell, User, ClipboardList, Tag, Archive, Shield
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
@@ -31,9 +31,6 @@ const adminNav: Record<string, NavItemConfig[]> = {
   ],
   TOOLS: [
     { label: 'AI Chat', href: '/dashboard/chat', icon: Bot },
-  ],
-  ACCOUNT: [
-    { label: 'Profile', href: '/dashboard/admin/profile', icon: User },
   ],
 }
 

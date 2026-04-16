@@ -113,7 +113,7 @@ export default function AdminAnnouncementsPage() {
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2" onClick={openCreate}><Plus className="size-4" /> New Announcement</Button>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 transition-transform hover:-translate-y-0.5" onClick={openCreate}><Plus className="size-4" /> New Announcement</Button>
           </DialogTrigger>
           <DialogContent className="rounded-2xl sm:max-w-[500px]">
             <DialogHeader><DialogTitle>{isEditing ? 'Edit Announcement' : 'Broadcast Announcement'}</DialogTitle></DialogHeader>
@@ -157,7 +157,7 @@ export default function AdminAnnouncementsPage() {
                   </div>
                 </div>
               </div>
-              <Button type="submit" disabled={saving} className="w-full bg-indigo-600 text-white rounded-xl mt-4">
+              <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl mt-4 transition-transform hover:-translate-y-0.5">
                 {saving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Broadcast Now')}
               </Button>
             </form>
@@ -185,7 +185,7 @@ export default function AdminAnnouncementsPage() {
                       <Badge variant="outline" className={`${cfg.colors} shrink-0 text-xs py-0.5`}>
                         <Icon className="size-3 mr-1"/> <span className="capitalize">{a.type || 'Info'}</span>
                       </Badge>
-                      {a.is_active ? <Badge variant="outline" className="border-indigo-200 text-indigo-600 bg-indigo-50">Active</Badge> 
+                      {a.is_active ? <Badge variant="outline" className="border-primary/20 text-primary bg-primary/10">Active</Badge> 
                                    : <Badge variant="secondary" className="text-slate-500">Hidden</Badge>}
                       <span className="text-xs text-slate-400">• {format(new Date(a.created_at), 'MMM d, yyyy - h:mm a')}</span>
                     </div>
@@ -199,7 +199,7 @@ export default function AdminAnnouncementsPage() {
                         {a.is_active ? 'On' : 'Off'}
                      </div>
                      <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-indigo-600" onClick={() => openEdit(a)}>
+                        <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-primary" onClick={() => openEdit(a)}>
                           <Edit className="size-4"/>
                         </Button>
                         <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-red-600" onClick={() => handleDelete(a.id)}>

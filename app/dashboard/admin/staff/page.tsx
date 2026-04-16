@@ -134,7 +134,7 @@ export default function AdminStaffPage() {
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 shadow-sm shadow-indigo-600/20">
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5">
               <Plus className="size-4" /> Add Staff Member
             </Button>
           </DialogTrigger>
@@ -160,16 +160,16 @@ export default function AdminStaffPage() {
                 <Label>Role Level</Label>
                 <div className="flex gap-4">
                   <Label className="flex items-center gap-2 cursor-pointer font-normal text-slate-600">
-                    <input type="radio" name="role" value="staff" checked={role === 'staff'} onChange={() => setRole('staff')} className="accent-indigo-600" />
+                    <input type="radio" name="role" value="staff" checked={role === 'staff'} onChange={() => setRole('staff')} className="accent-primary" />
                     Library Staff
                   </Label>
                   <Label className="flex items-center gap-2 cursor-pointer font-normal text-slate-600">
-                    <input type="radio" name="role" value="admin" checked={role === 'admin'} onChange={() => setRole('admin')} className="accent-indigo-600" />
+                    <input type="radio" name="role" value="admin" checked={role === 'admin'} onChange={() => setRole('admin')} className="accent-primary" />
                     Administrator
                   </Label>
                 </div>
               </div>
-              <Button type="submit" disabled={saving} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+              <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-transform hover:-translate-y-0.5">
                 {saving ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
@@ -182,7 +182,7 @@ export default function AdminStaffPage() {
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: 'Total Accounts', value: staff.length, color: 'text-slate-900' },
-            { label: 'Administrators', value: adminCount, color: 'text-indigo-600' },
+            { label: 'Administrators', value: adminCount, color: 'text-primary' },
             { label: 'Staff Members', value: staffCount, color: 'text-violet-600' },
           ].map(s => (
             <div key={s.label} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-center">
@@ -258,7 +258,7 @@ export default function AdminStaffPage() {
                   {/* Name + avatar */}
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className={`size-10 rounded-full flex items-center justify-center text-white font-bold shrink-0 shadow-sm ${s.role === 'admin' ? 'bg-indigo-600' : 'bg-violet-500'}`}>
+                      <div className={`size-10 rounded-full flex items-center justify-center text-primary-foreground font-bold shrink-0 shadow-sm ${s.role === 'admin' ? 'bg-primary' : 'bg-slate-700'}`}>
                         {initials}
                       </div>
                       <div>
@@ -289,7 +289,7 @@ export default function AdminStaffPage() {
 
                   {/* Role badge */}
                   <td className="p-4">
-                    <Badge variant="outline" className={`border-transparent ${s.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-violet-100 text-violet-700'}`}>
+                    <Badge variant="outline" className={`border-transparent ${s.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-700'}`}>
                       {s.role === 'admin' ? <ShieldAlert className="size-3 mr-1" /> : <Shield className="size-3 mr-1" />}
                       <span className="capitalize">{s.role}</span>
                     </Badge>

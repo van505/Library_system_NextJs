@@ -185,7 +185,7 @@ export default function AdminShelvesPage() {
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 shadow-sm shadow-indigo-600/20" onClick={openCreate}>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5" onClick={openCreate}>
               <Plus className="size-4" /> Add Shelf
             </Button>
           </DialogTrigger>
@@ -207,7 +207,7 @@ export default function AdminShelvesPage() {
                 <Label>Notes / Description</Label>
                 <Textarea value={description} onChange={e => setDescription(e.target.value)} className="rounded-xl resize-none" rows={3} placeholder="Additional info about this shelf..." />
               </div>
-              <Button type="submit" disabled={saving} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+              <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-transform hover:-translate-y-0.5">
                 {saving ? 'Saving...' : isEditing ? 'Update Shelf' : 'Create Shelf'}
               </Button>
             </form>
@@ -219,7 +219,7 @@ export default function AdminShelvesPage() {
       {!loading && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total Shelves', value: summary.total, icon: Library, color: 'text-indigo-600 bg-indigo-50' },
+            { label: 'Total Shelves', value: summary.total, icon: Library, color: 'text-primary bg-primary/10' },
             { label: 'Books Stored', value: summary.totalBooks, icon: BookOpen, color: 'text-violet-600 bg-violet-50' },
             { label: 'Full Shelves', value: summary.full, icon: AlertTriangle, color: 'text-red-600 bg-red-50' },
             { label: 'Empty Shelves', value: summary.empty, icon: LayoutGrid, color: 'text-slate-500 bg-slate-100' },
@@ -322,8 +322,8 @@ export default function AdminShelvesPage() {
                     {/* Header row */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
-                        <div className="size-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-                          <Library className="size-5 text-indigo-600" />
+                        <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <Library className="size-5 text-primary" />
                         </div>
                         <div className="min-w-0">
                           <h3 className="font-semibold text-slate-900 leading-tight truncate">{s.name}</h3>
@@ -339,7 +339,7 @@ export default function AdminShelvesPage() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="size-8 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                          className="size-8 rounded-lg text-slate-400 hover:text-primary hover:bg-primary/10"
                           onClick={() => openEdit(s)}
                           title="Edit shelf"
                         >

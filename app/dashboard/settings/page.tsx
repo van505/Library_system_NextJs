@@ -123,8 +123,8 @@ export default function SettingsPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <div className="size-10 rounded-2xl bg-indigo-100 flex items-center justify-center">
-          <Settings className="size-5 text-indigo-600" />
+        <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Settings className="size-5 text-primary" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
@@ -141,7 +141,7 @@ export default function SettingsPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${active ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${active ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Icon className="size-4" />
               {tab.label}
@@ -168,8 +168,8 @@ export default function SettingsPage() {
                     const active = theme === opt.value
                     return (
                       <button key={opt.value} onClick={() => handleThemeChange(opt.value)}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${active ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50 text-slate-600'}`}>
-                        <Icon className={`size-5 ${active ? 'text-indigo-600' : 'text-slate-500'}`} />
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${active ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 hover:border-primary/30 hover:bg-slate-50 text-slate-600'}`}>
+                        <Icon className={`size-5 ${active ? 'text-primary' : 'text-slate-500'}`} />
                         <span className="text-xs font-semibold">{opt.label}</span>
                       </button>
                     )
@@ -219,7 +219,7 @@ export default function SettingsPage() {
                   <Switch checked={notifLoaded ? item.value : true} onCheckedChange={item.set} disabled={!notifLoaded} />
                 </div>
               ))}
-              <Button onClick={saveNotifPrefs} disabled={savingNotif || !notifLoaded} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl mt-2">
+              <Button onClick={saveNotifPrefs} disabled={savingNotif || !notifLoaded} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl mt-2 transition-transform hover:-translate-y-0.5">
                 {savingNotif ? 'Saving...' : 'Save Preferences'}
               </Button>
             </CardContent>
@@ -294,7 +294,7 @@ export default function SettingsPage() {
                     const active = saved === String(days)
                     return (
                       <button key={days} onClick={() => { localStorage.setItem('defaultBorrowDays', String(days)); toast.success(`Default set to ${days} days.`) }}
-                        className={`px-4 py-2 text-sm font-semibold transition-colors ${active ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                        className={`px-4 py-2 text-sm font-semibold transition-colors ${active ? 'bg-primary text-primary-foreground' : 'text-slate-600 hover:bg-slate-50'}`}>
                         {days}d
                       </button>
                     )

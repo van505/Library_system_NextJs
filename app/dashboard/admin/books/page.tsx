@@ -180,7 +180,7 @@ function CoverImageInput({
         />
       ) : (
         <div
-          className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors"
+          className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-primary/30 hover:bg-primary/5 transition-colors"
           onClick={() => fileRef.current?.click()}
         >
           <input
@@ -422,7 +422,7 @@ export default function AdminBooksPage() {
           )}
           <Dialog open={isOpen} onOpenChange={open => { setIsOpen(open); if (!open) resetForm() }}>
             <DialogTrigger asChild>
-              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 shadow-sm shadow-indigo-600/20" onClick={openCreate}>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5" onClick={openCreate}>
                 <Plus className="size-4" /> Add Book
               </Button>
             </DialogTrigger>
@@ -509,7 +509,7 @@ export default function AdminBooksPage() {
                   />
                 </div>
 
-                <Button type="submit" disabled={saving} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-11">
+                <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-11 transition-transform hover:-translate-y-0.5">
                   {saving ? 'Saving...' : isEditing ? 'Update Book' : 'Add Book'}
                 </Button>
               </form>
@@ -524,7 +524,7 @@ export default function AdminBooksPage() {
           { label: 'Total', value: totalAcc, color: 'text-slate-900' },
           { label: 'Available', value: availAcc, color: 'text-emerald-600' },
           { label: 'Borrowed', value: borrowAcc, color: 'text-amber-600' },
-          { label: 'Categories', value: categoriesDbCount, color: 'text-indigo-600' },
+          { label: 'Categories', value: categoriesDbCount, color: 'text-primary' },
         ].map(s => (
           <div key={s.label} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{s.label}</p>
@@ -650,7 +650,7 @@ export default function AdminBooksPage() {
                     </Badge>
                   </td>
                   <td className="p-4 text-right">
-                    <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-indigo-600" onClick={() => openEdit(b)}>
+                    <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-primary" onClick={() => openEdit(b)}>
                       <Edit className="size-4" />
                     </Button>
                     <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-red-600" onClick={() => handleDelete(b.id)}>
