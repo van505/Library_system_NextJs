@@ -14,6 +14,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { logActivity, ACTION_TYPES } from '@/lib/activityLog'
+import { useAuthStore } from '@/lib/store'
+import { CSVImportDialog } from '@/components/dashboard/csv-import'
+import { QRDialog } from '@/components/dashboard/qr-dialog'
 import { BookOpen, Search, Plus, Trash2, Edit, Filter, X, Link as LinkIcon, Upload, ImageIcon } from 'lucide-react'
 import type { Shelf, Category } from '@/lib/supabase'
 
@@ -271,6 +275,18 @@ export default function AdminBooksPage() {
 
   React.useEffect(() => { loadData() }, [])
 
+  React.useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const targetBookId = searchParams.get('book')
+    if (targetBookId && books.length > 0) {
+      const target = books.find(b => b.id === targetBookId)
+      if (target && !isOpen) {
+        openEdit(target)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    }
+  }, [books])
+
   function resetForm() {
     setTitle(''); setAuthor(''); setIsbn(''); setDescription('')
     setSelectedCats([]); setShelfId(''); setPublisher(''); setYear('')
@@ -362,6 +378,16 @@ export default function AdminBooksPage() {
         if (error) throw error
       }
 
+      await logActivity(supabase, {
+        performed_by: useAuthStore.getState().profile?.id,
+        role: 'admin',
+        action_type: isEditing ? ACTION_TYPES.BOOK_EDITED : ACTION_TYPES.BOOK_ADDED,
+        entity_type: 'book',
+        entity_id: bookId,
+        entity_name: title,
+        description: `Admin ${isEditing ? 'edited' : 'added'} book '${title}'`,
+      })
+
       toast.success(isEditing ? 'Book updated' : 'Book added')
       setIsOpen(false)
       loadData()
@@ -376,7 +402,19 @@ export default function AdminBooksPage() {
     if (!confirm('Delete this book? Historic transactions may be affected.')) return
     const { error } = await supabase.from('books').delete().eq('id', id)
     if (error) toast.error(error.message)
-    else { toast.success('Book deleted'); loadData(); setSelectedIds(new Set()) }
+    else { 
+      await logActivity(supabase, {
+        performed_by: useAuthStore.getState().profile?.id,
+        role: 'admin',
+        action_type: ACTION_TYPES.BOOK_DELETED,
+        entity_type: 'book',
+        entity_id: id,
+        description: `Admin deleted book ID ${id}`,
+      })
+      toast.success('Book deleted')
+      loadData()
+      setSelectedIds(new Set()) 
+    }
   }
 
   async function handleBulkDelete() {
@@ -384,7 +422,19 @@ export default function AdminBooksPage() {
     if (!confirm(`Delete ${selectedIds.size} selected books?`)) return
     const { error } = await supabase.from('books').delete().in('id', Array.from(selectedIds))
     if (error) toast.error(error.message)
-    else { toast.success('Books deleted'); loadData(); setSelectedIds(new Set()) }
+    else { 
+      await logActivity(supabase, {
+        performed_by: useAuthStore.getState().profile?.id,
+        role: 'admin',
+        action_type: ACTION_TYPES.BOOK_DELETED,
+        entity_type: 'book',
+        description: `Admin bulk deleted ${selectedIds.size} books`,
+        metadata: { count: selectedIds.size }
+      })
+      toast.success('Books deleted')
+      loadData()
+      setSelectedIds(new Set()) 
+    }
   }
 
   const toggleSelect = (id: string) => {
@@ -420,6 +470,7 @@ export default function AdminBooksPage() {
               <Trash2 className="size-4 mr-2" /> Delete ({selectedIds.size})
             </Button>
           )}
+          <CSVImportDialog onSuccess={loadData} />
           <Dialog open={isOpen} onOpenChange={open => { setIsOpen(open); if (!open) resetForm() }}>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 shadow-sm shadow-primary/20 transition-transform hover:-translate-y-0.5" onClick={openCreate}>
@@ -650,6 +701,13 @@ export default function AdminBooksPage() {
                     </Badge>
                   </td>
                   <td className="p-4 text-right">
+                    <QRDialog 
+                      bookId={b.id} 
+                      bookTitle={b.title} 
+                      isbn={b.isbn || undefined} 
+                      shelfName={(b.shelves as any)?.name || undefined}
+                      baseUrl="/dashboard/admin/books"
+                    />
                     <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-primary" onClick={() => openEdit(b)}>
                       <Edit className="size-4" />
                     </Button>

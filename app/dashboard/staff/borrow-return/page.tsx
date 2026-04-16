@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { notifyAdmins, notifyUser } from '@/lib/notifyAdmins'
 import { toast } from 'sonner'
+import { ReturnDialog } from '@/components/dashboard/return-dialog'
 import {
   ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Search, Plus,
   XCircle, CalendarCheck, Edit, Archive
@@ -64,6 +65,10 @@ export default function StaffTransactionsPage() {
 
   // ── Archive confirm dialog ─────────────────────────────────────────────
   const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; table: string; label: string } | null>(null)
+
+  // ── Return Dialog State ────────────────────────────────────────────────
+  const [returnDialogOpen, setReturnDialogOpen] = React.useState(false)
+  const [returnTarget, setReturnTarget] = React.useState<{ txId: string; bookId: string; studentId: string | null; bookTitle: string } | null>(null)
 
   // ── Load Transactions ──────────────────────────────────────────────────
   async function loadTransactions() {
@@ -170,31 +175,8 @@ export default function StaffTransactionsPage() {
     setBorrowing(false)
   }
 
-  // ── BUG 1 FIX: Safe return — LEAST(available + 1, total_copies) ────────
-  async function handleMarkReturned(txId: string, bookId: string, studentId: string | null) {
-    const { error: markErr } = await supabase.from('transactions')
-      .update({ status: 'returned', returned_at: new Date().toISOString() })
-      .eq('id', txId)
-    if (!markErr) {
-      const { data: bk } = await supabase.from('books')
-        .select('available_copies, total_copies')
-        .eq('id', bookId).single()
-      if (bk) {
-        await supabase.from('books')
-          .update({ available_copies: Math.min(bk.available_copies + 1, bk.total_copies) })
-          .eq('id', bookId)
-      }
-      if (studentId) {
-        await notifyUser(
-          studentId, 'Book Returned ✅',
-          'Thank you! The book has been marked as returned.',
-          'success', '/dashboard/student/requests'
-        )
-      }
-      toast.success('Transaction marked as returned.')
-      loadTransactions()
-    } else toast.error(markErr.message)
-  }
+  // handleMarkReturned logic has been moved to the <ReturnDialog /> component
+  // to support Feature D (Condition check on return)
 
   // ── Approve (as-is, use proposed_return_date) ─────────────────────────
   async function handleApprove(r: any) {
@@ -328,7 +310,7 @@ export default function StaffTransactionsPage() {
       }
 
       const studentName = declineTarget.profile?.full_name ?? 'a student'
-      await notifyAdmins(supabase,
+      await notifyAdmins(
         `${staffProfile?.full_name ?? 'Staff'} declined a reservation`,
         `Declined ${studentName}'s request for "${bookTitle}".${declineReason ? ` Reason: ${declineReason}` : ''}`,
         '/dashboard/admin/borrow-return'
@@ -601,7 +583,10 @@ export default function StaffTransactionsPage() {
                     <td className="p-4 text-right align-top space-y-1.5">
                       {t.status === 'borrowed' && (
                         <Button size="sm" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 w-full"
-                          onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>
+                          onClick={() => {
+                            setReturnTarget({ txId: t.id, bookId: t.book_id, studentId: t.borrower_id, bookTitle: book?.title ?? 'a book' })
+                            setReturnDialogOpen(true)
+                          }}>
                           Mark Returned
                         </Button>
                       )}
@@ -710,6 +695,17 @@ export default function StaffTransactionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Return Dialog Modal */}
+      <ReturnDialog 
+        open={returnDialogOpen} 
+        onOpenChange={setReturnDialogOpen} 
+        transactionId={returnTarget?.txId ?? null}
+        bookId={returnTarget?.bookId ?? null}
+        studentId={returnTarget?.studentId ?? null}
+        bookTitle={returnTarget?.bookTitle ?? ''}
+        onSuccess={() => loadTransactions()}
+      />
     </div>
   )
 }

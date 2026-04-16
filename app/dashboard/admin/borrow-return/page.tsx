@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { createClient } from '@/lib/supabase'
 import { notifyUser } from '@/lib/notifyAdmins'
 import { toast } from 'sonner'
+import { ReturnDialog } from '@/components/dashboard/return-dialog'
 import { ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Search, Plus, XCircle, CalendarCheck, Edit, Archive, Trash2 } from 'lucide-react'
 import { format, isPast, differenceInDays, addDays } from 'date-fns'
 import { toInputDate, getMinReturnDate, getMaxReturnDate, validateReturnDate } from '@/lib/dateUtils'
@@ -53,6 +54,10 @@ export default function AdminBorrowReturnPage() {
   // Archive / Delete (admin-only)
   const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; table: string; label: string } | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; table: string; bookId?: string; status?: string; label: string } | null>(null)
+
+  // Return dialog state
+  const [returnDialogOpen, setReturnDialogOpen] = React.useState(false)
+  const [returnTarget, setReturnTarget] = React.useState<{ txId: string; bookId: string; studentId: string | null; bookTitle: string } | null>(null)
 
   async function loadTransactions() {
     setTxLoading(true)
@@ -106,15 +111,7 @@ export default function AdminBorrowReturnPage() {
     setBorrowing(false)
   }
 
-  async function handleMarkReturned(txId: string, bookId: string, studentId: string) {
-    const { error } = await supabase.from('transactions').update({ status: 'returned', returned_at: new Date().toISOString() }).eq('id', txId)
-    if (!error) {
-      const { data: bk } = await supabase.from('books').select('available_copies, total_copies').eq('id', bookId).single()
-      if (bk) await supabase.from('books').update({ available_copies: Math.min(bk.available_copies + 1, bk.total_copies) }).eq('id', bookId)
-      if (studentId) await notifyUser(studentId, 'Book Returned ✅', 'Marked as returned.', 'success', '/dashboard/student/requests')
-      toast.success('Returned.'); loadTransactions()
-    } else toast.error(error.message)
-  }
+  // handleMarkReturned logic replaced by <ReturnDialog /> component
 
   async function handleApprove(r: any) {
     const bookTitle = (r.books as any)?.title ?? r.book_title
@@ -312,7 +309,7 @@ export default function AdminBorrowReturnPage() {
                       </td>
                       <td className="p-4 align-top">{statusEl}</td>
                       <td className="p-4 text-right align-top space-y-1.5">
-                        {t.status === 'borrowed' && <Button size="sm" variant="outline" className="w-full bg-white border-slate-200 text-slate-700 hover:bg-primary/5 hover:text-primary" onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>Mark Returned</Button>}
+                        {t.status === 'borrowed' && <Button size="sm" variant="outline" className="w-full bg-white border-slate-200 text-slate-700 hover:bg-primary/5 hover:text-primary" onClick={() => { setReturnTarget({ txId: t.id, bookId: t.book_id, studentId: t.borrower_id, bookTitle: book?.title ?? 'a book' }); setReturnDialogOpen(true) }}>Mark Returned</Button>}
                         {/* Archive & Delete (admin-only) */}
                         <div className="flex gap-1 justify-end">
                           <Button size="sm" variant="ghost" className="text-amber-600 hover:bg-amber-50" onClick={() => setArchiveTarget({ id: t.id, table: 'transactions', label: book?.title ?? 'record' })}><Archive className="size-3" /></Button>
@@ -360,6 +357,17 @@ export default function AdminBorrowReturnPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="text-red-600">Permanently delete?</AlertDialogTitle><AlertDialogDescription>&ldquo;{deleteTarget?.label}&rdquo; will be <strong>permanently deleted</strong>. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete Permanently</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
+
+      {/* Return Dialog */}
+      <ReturnDialog 
+        open={returnDialogOpen} 
+        onOpenChange={setReturnDialogOpen} 
+        transactionId={returnTarget?.txId ?? null}
+        bookId={returnTarget?.bookId ?? null}
+        studentId={returnTarget?.studentId ?? null}
+        bookTitle={returnTarget?.bookTitle ?? ''}
+        onSuccess={() => loadTransactions()}
+      />
     </div>
   )
 }

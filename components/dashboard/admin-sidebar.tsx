@@ -6,7 +6,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, Library, Users, ArrowLeftRight,
   Bot, LogOut, Menu, X, GraduationCap,
-  Bell, User, ClipboardList, Tag, Archive, Shield
+  Bell, User, ClipboardList, Tag, Archive, Shield,
+  History, PieChart, CalendarDays
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
@@ -22,12 +23,17 @@ const adminNav: Record<string, NavItemConfig[]> = {
     { label: 'Manage Categories', href: '/dashboard/admin/categories', icon: Tag },
     { label: 'Borrow / Return', href: '/dashboard/admin/borrow-return', icon: ArrowLeftRight },
     { label: 'Transactions', href: '/dashboard/admin/transactions', icon: ArrowLeftRight },
+    { label: 'Reservation Calendar', href: '/dashboard/admin/calendar', icon: CalendarDays },
     { label: 'Book Requests', href: '/dashboard/admin/requests', icon: ClipboardList },
     { label: 'Announcements', href: '/dashboard/admin/announcements', icon: Bell },
     { label: 'Archive', href: '/dashboard/admin/archive', icon: Archive },
   ],
   STAFF: [
     { label: 'Manage Staff', href: '/dashboard/admin/staff', icon: Users },
+  ],
+  REPORTS: [
+    { label: 'Analytics & Reports', href: '/dashboard/admin/reports', icon: PieChart },
+    { label: 'Activity Log', href: '/dashboard/admin/activity-log', icon: History },
   ],
   TOOLS: [
     { label: 'AI Chat', href: '/dashboard/chat', icon: Bot },

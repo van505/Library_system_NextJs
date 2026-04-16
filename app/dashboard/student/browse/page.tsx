@@ -73,6 +73,18 @@ export default function StudentBrowsePage() {
 
   React.useEffect(() => { loadData() }, [])
 
+  React.useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const targetBookId = searchParams.get('book')
+    if (targetBookId && books.length > 0) {
+      const target = books.find(b => b.id === targetBookId)
+      if (target && !isModalOpen) {
+        openBook(target)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    }
+  }, [books])
+
   async function openBook(b: BookRow) {
     setSelectedBook(b)
     setReviews([])

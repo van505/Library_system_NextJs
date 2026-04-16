@@ -16,6 +16,8 @@ import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { notifyAdmins } from '@/lib/notifyAdmins'
 import { toast } from 'sonner'
+import { logActivity, ACTION_TYPES } from '@/lib/activityLog'
+import { QRDialog } from '@/components/dashboard/qr-dialog'
 import { BookOpen, Search, Plus, Trash2, Edit, Filter, X, Link as LinkIcon, Upload, ImageIcon } from 'lucide-react'
 import type { Shelf, Category } from '@/lib/supabase'
 
@@ -270,6 +272,18 @@ export default function StaffBooksPage() {
 
   React.useEffect(() => { loadData() }, [])
 
+  React.useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const targetBookId = searchParams.get('book')
+    if (targetBookId && books.length > 0) {
+      const target = books.find(b => b.id === targetBookId)
+      if (target && !isOpen) {
+        openEdit(target)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    }
+  }, [books])
+
   function resetForm() {
     setTitle(''); setAuthor(''); setIsbn(''); setDescription('')
     setSelectedCats([]); setShelfId(''); setPublisher(''); setYear('')
@@ -361,6 +375,16 @@ export default function StaffBooksPage() {
         if (error) throw error
       }
 
+      await logActivity(supabase, {
+        performed_by: staffProfile?.id || useAuthStore.getState().profile?.id,
+        role: 'staff',
+        action_type: isEditing ? ACTION_TYPES.BOOK_EDITED : ACTION_TYPES.BOOK_ADDED,
+        entity_type: 'book',
+        entity_id: bookId,
+        entity_name: title,
+        description: `Staff ${isEditing ? 'edited' : 'added'} book '${title}'`,
+      })
+
       toast.success(isEditing ? 'Book updated' : 'Book added')
       setIsOpen(false)
       loadData()
@@ -383,6 +407,14 @@ export default function StaffBooksPage() {
     const { error } = await supabase.from('books').delete().eq('id', id)
     if (error) toast.error(error.message)
     else {
+      await logActivity(supabase, {
+        performed_by: staffProfile?.id || useAuthStore.getState().profile?.id,
+        role: 'staff',
+        action_type: ACTION_TYPES.BOOK_DELETED,
+        entity_type: 'book',
+        entity_id: id,
+        description: `Staff deleted book ID ${id}`,
+      })
       toast.success('Book deleted')
       await notifyAdmins(`${staffProfile?.full_name ?? 'Staff'} deleted a book`, `Deleted "${target?.title ?? 'a book'}" from the catalog.`, '/dashboard/admin/books')
       loadData(); setSelectedIds(new Set())
@@ -394,7 +426,17 @@ export default function StaffBooksPage() {
     if (!confirm(`Delete ${selectedIds.size} selected books?`)) return
     const { error } = await supabase.from('books').delete().in('id', Array.from(selectedIds))
     if (error) toast.error(error.message)
-    else { toast.success('Books deleted'); loadData(); setSelectedIds(new Set()) }
+    else { 
+      await logActivity(supabase, {
+        performed_by: staffProfile?.id || useAuthStore.getState().profile?.id,
+        role: 'staff',
+        action_type: ACTION_TYPES.BOOK_DELETED,
+        entity_type: 'book',
+        description: `Staff bulk deleted ${selectedIds.size} books`,
+        metadata: { count: selectedIds.size }
+      })
+      toast.success('Books deleted'); loadData(); setSelectedIds(new Set()) 
+    }
   }
 
   const toggleSelect = (id: string) => {
@@ -660,6 +702,13 @@ export default function StaffBooksPage() {
                     </Badge>
                   </td>
                   <td className="p-4 text-right">
+                    <QRDialog 
+                      bookId={b.id} 
+                      bookTitle={b.title} 
+                      isbn={b.isbn || undefined} 
+                      shelfName={(b.shelves as any)?.name || undefined}
+                      baseUrl="/dashboard/staff/books"
+                    />
                     <Button size="icon" variant="ghost" className="size-8 text-slate-400 hover:text-indigo-600" onClick={() => openEdit(b)}>
                       <Edit className="size-4" />
                     </Button>

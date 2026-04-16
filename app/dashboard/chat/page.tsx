@@ -160,7 +160,7 @@ export default function LibbyChatPage() {
              </Button>
            </form>
            <p className="text-center text-[10px] text-slate-400 mt-4 uppercase tracking-widest font-bold">
-              Libby uses Groq · Llama 3.3 · Results may vary
+              Libby uses Google Gemini 2.5 Flash · Results may vary
             </p>
         </div>
       </Card>

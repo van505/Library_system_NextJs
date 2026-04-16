@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { logActivity, ACTION_TYPES } from '@/lib/activityLog'
+import { useAuthStore } from '@/lib/store'
 import { Library, MapPin, Plus, Edit, Trash2, Search, BookOpen, LayoutGrid, AlertTriangle } from 'lucide-react'
 import type { Shelf } from '@/lib/supabase'
 
@@ -157,6 +159,15 @@ export default function AdminShelvesPage() {
     setSaving(false)
     if (error) toast.error(error.message)
     else {
+      await logActivity(supabase, {
+        performed_by: useAuthStore.getState().profile?.id,
+        role: 'admin',
+        action_type: isEditing ? ACTION_TYPES.SHELF_EDITED : ACTION_TYPES.SHELF_ADDED,
+        entity_type: 'shelf',
+        entity_id: editingId || undefined,
+        entity_name: name,
+        description: `Admin ${isEditing ? 'edited' : 'added'} shelf '${name}'`,
+      })
       toast.success(isEditing ? 'Shelf updated' : 'Shelf created')
       setIsOpen(false)
       loadData()
@@ -171,7 +182,17 @@ export default function AdminShelvesPage() {
     if (!confirm('Delete this shelf? This cannot be undone.')) return
     const { error } = await supabase.from('shelves').delete().eq('id', id)
     if (error) toast.error(error.message)
-    else { toast.success('Shelf deleted'); loadData() }
+    else { 
+      await logActivity(supabase, {
+        performed_by: useAuthStore.getState().profile?.id,
+        role: 'admin',
+        action_type: ACTION_TYPES.SHELF_DELETED,
+        entity_type: 'shelf',
+        entity_id: id,
+        description: `Admin deleted shelf ID ${id}`,
+      })
+      toast.success('Shelf deleted'); loadData() 
+    }
   }
 
   return (

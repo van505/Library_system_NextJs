@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { notifyAdmins } from '@/lib/notifyAdmins'
 import { toast } from 'sonner'
+import { logActivity, ACTION_TYPES } from '@/lib/activityLog'
 import { Library, MapPin, Plus, Edit, Trash2, Search, BookOpen, LayoutGrid, AlertTriangle } from 'lucide-react'
 import type { Shelf } from '@/lib/supabase'
 
@@ -160,6 +161,15 @@ export default function StaffShelvesPage() {
     setSaving(false)
     if (error) toast.error(error.message)
     else {
+      await logActivity(supabase, {
+        performed_by: staffProfile?.id || useAuthStore.getState().profile?.id,
+        role: 'staff',
+        action_type: isEditing ? ACTION_TYPES.SHELF_EDITED : ACTION_TYPES.SHELF_ADDED,
+        entity_type: 'shelf',
+        entity_id: editingId || undefined,
+        entity_name: name,
+        description: `Staff ${isEditing ? 'edited' : 'added'} shelf '${name}'`,
+      })
       toast.success(isEditing ? 'Shelf updated' : 'Shelf created')
       await notifyAdmins(
         isEditing ? `${staffProfile?.full_name ?? 'Staff'} edited a shelf` : `${staffProfile?.full_name ?? 'Staff'} added a shelf`,
@@ -181,6 +191,14 @@ export default function StaffShelvesPage() {
     const { error } = await supabase.from('shelves').delete().eq('id', id)
     if (error) toast.error(error.message)
     else {
+      await logActivity(supabase, {
+        performed_by: staffProfile?.id || useAuthStore.getState().profile?.id,
+        role: 'staff',
+        action_type: ACTION_TYPES.SHELF_DELETED,
+        entity_type: 'shelf',
+        entity_id: id,
+        description: `Staff deleted shelf ID ${id}`,
+      })
       toast.success('Shelf deleted')
       await notifyAdmins(`${staffProfile?.full_name ?? 'Staff'} deleted a shelf`, `Deleted shelf "${target?.name ?? 'a shelf'}".`, '/dashboard/admin/shelves')
       loadData()
