@@ -26,6 +26,13 @@ function applyTheme(theme: Theme) {
   localStorage.setItem('theme', theme)
 }
 
+function applyAccent(accent: string) {
+  const root = document.documentElement
+  root.classList.remove('theme-rose', 'theme-emerald', 'theme-ocean') // 'indigo' is default (no class)
+  if (accent !== 'indigo') root.classList.add(`theme-${accent}`)
+  localStorage.setItem('accent-theme', accent)
+}
+
 export default function SettingsPage() {
   const supabase = createClient()
   const { profile } = useAuthStore()
@@ -35,14 +42,20 @@ export default function SettingsPage() {
 
   // ── Appearance ──────────────────────────────────────────────────────────
   const [theme, setTheme] = React.useState<Theme>('light')
+  const [accent, setAccent] = React.useState('indigo')
 
   React.useEffect(() => {
-    const saved = (localStorage.getItem('theme') ?? 'light') as Theme
-    setTheme(saved)
-    applyTheme(saved)
+    const savedTheme = (localStorage.getItem('theme') ?? 'light') as Theme
+    setTheme(savedTheme)
+    applyTheme(savedTheme)
+
+    const savedAccent = localStorage.getItem('accent-theme') ?? 'indigo'
+    setAccent(savedAccent)
+    applyAccent(savedAccent)
   }, [])
 
   function handleThemeChange(t: Theme) { setTheme(t); applyTheme(t) }
+  function handleAccentChange(a: string) { setAccent(a); applyAccent(a) }
 
   // ── Notification Preferences ───────────────────────────────────────────
   const [notifEmail, setNotifEmail] = React.useState(true)
@@ -163,7 +176,26 @@ export default function SettingsPage() {
                   })}
                 </div>
               </div>
-              <div className="flex items-center justify-between py-2 border-t border-slate-100">
+              <div className="pt-2">
+                <Label className="text-sm font-medium text-slate-700 mb-3 block">Accent Color</Label>
+                <div className="flex gap-3">
+                  {[
+                    { value: 'indigo', label: 'Indigo', color: 'bg-indigo-600' },
+                    { value: 'rose', label: 'Rose', color: 'bg-rose-600' },
+                    { value: 'emerald', label: 'Emerald', color: 'bg-emerald-600' },
+                    { value: 'ocean', label: 'Ocean', color: 'bg-cyan-600' },
+                  ].map(opt => {
+                    const active = accent === opt.value
+                    return (
+                      <button key={opt.value} onClick={() => handleAccentChange(opt.value)} title={opt.label}
+                        className={`size-8 rounded-full shadow-sm transition-all flex items-center justify-center border-2 ${active ? 'border-slate-900 scale-110' : 'border-transparent hover:scale-105'} ${opt.color}`}>
+                        {active && <div className="size-2 bg-white rounded-full" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-2 border-t border-slate-100 mt-4">
                 <div><p className="text-sm font-medium text-slate-700">Language</p><p className="text-xs text-slate-500">Interface language</p></div>
                 <span className="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg">English</span>
               </div>

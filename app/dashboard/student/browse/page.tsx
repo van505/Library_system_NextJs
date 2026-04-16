@@ -177,11 +177,11 @@ export default function StudentBrowsePage() {
       <div className="overflow-x-auto pb-2 scrollbar-hide">
         <Tabs value={category} onValueChange={setCategory} className="w-max">
           <TabsList className="bg-transparent space-x-2 h-auto p-0">
-            <TabsTrigger value="all" className="rounded-full px-6 py-2.5 bg-white border border-slate-200 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:border-indigo-600 shadow-sm transition-all">
+            <TabsTrigger value="all" className="rounded-full px-6 py-2.5 bg-white border border-slate-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all">
               All Genres
             </TabsTrigger>
             {allCategories.map(c => (
-              <TabsTrigger key={c.id} value={c.id} className="rounded-full px-5 py-2.5 bg-white border border-slate-200 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:border-indigo-600 shadow-sm transition-all">
+              <TabsTrigger key={c.id} value={c.id} className="rounded-full px-5 py-2.5 bg-white border border-slate-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all">
                 {c.name}
               </TabsTrigger>
             ))}
@@ -357,7 +357,7 @@ export default function StudentBrowsePage() {
                                 ))}
                               </div>
                             </div>
-                            <p className="text-slate-600 leading-relaxed">{r.review_text}</p>
+                            <p className="text-slate-600 leading-relaxed">{r.comment}</p>
                           </div>
                         ))}
                       </div>
@@ -369,7 +369,7 @@ export default function StudentBrowsePage() {
                 <div className="mt-6 pt-6 border-t border-slate-100">
                   {selectedBook.available_copies > 0 ? (
                     <Button
-                      className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold shadow-lg shadow-indigo-200 gap-2"
+                      className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-bold shadow-lg shadow-primary/20 gap-2 transition-transform hover:-translate-y-1"
                       onClick={openReturnDateDialog}
                     >
                       <CalendarCheck className="size-5" />
@@ -394,7 +394,7 @@ export default function StudentBrowsePage() {
         <DialogContent className="rounded-2xl sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CalendarCheck className="size-5 text-indigo-600" />
+              <CalendarCheck className="size-5 text-primary" />
               When will you return it?
             </DialogTitle>
             <DialogDescription>
@@ -426,7 +426,7 @@ export default function StudentBrowsePage() {
                 Cancel
               </Button>
               <Button
-                className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="flex-1 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground"
                 onClick={handleRequestBorrow}
                 disabled={requesting || !!returnDateError || !proposedReturnDate}
               >

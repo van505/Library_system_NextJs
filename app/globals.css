@@ -85,6 +85,28 @@
   --sidebar-ring: #4f46e5;
 }
 
+/* ── Custom Theme Colors (Phase 3) ───────────────────────────────── */
+:root.theme-rose {
+  --primary: #e11d48;
+  --ring: #e11d48;
+  --sidebar-primary: #e11d48;
+  --sidebar-ring: #e11d48;
+}
+
+:root.theme-emerald {
+  --primary: #059669;
+  --ring: #059669;
+  --sidebar-primary: #059669;
+  --sidebar-ring: #059669;
+}
+
+:root.theme-ocean {
+  --primary: #0891b2;
+  --ring: #0891b2;
+  --sidebar-primary: #0891b2;
+  --sidebar-ring: #0891b2;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

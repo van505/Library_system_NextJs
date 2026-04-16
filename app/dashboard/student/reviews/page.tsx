@@ -50,7 +50,7 @@ export default function StudentReviewsPage() {
     const existing = reviews[bookId]
     setEditingData(prev => ({
       ...prev,
-      [bookId]: { rating: existing?.rating || 5, text: existing?.review_text || '', saving: false }
+      [bookId]: { rating: existing?.rating || 5, text: existing?.comment || '', saving: false }
     }))
   }
 
@@ -76,7 +76,7 @@ export default function StudentReviewsPage() {
 
     updateEditData(bookId, { saving: true })
 
-    const payload = { book_id: bookId, user_id: myId, rating: ed.rating, review_text: ed.text.trim() }
+    const payload = { book_id: bookId, user_id: myId, rating: ed.rating, comment: ed.text.trim() }
     
     let error;
     if (reviews[bookId]) {
@@ -158,7 +158,7 @@ export default function StudentReviewsPage() {
                          />
                          <div className="flex gap-2 justify-end pt-2">
                            <Button variant="outline" onClick={() => cancelEdit(b.id)} className="rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</Button>
-                           <Button onClick={() => handleSaveReview(b.id)} disabled={ed.saving} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+                           <Button onClick={() => handleSaveReview(b.id)} disabled={ed.saving} className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm hover:-translate-y-0.5 transition-transform">
                              {ed.saving ? 'Saving...' : 'Publish Review'}
                            </Button>
                          </div>
@@ -173,9 +173,9 @@ export default function StudentReviewsPage() {
                              <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md"><Check className="size-3 mr-1"/> Published</span>
                            </div>
                          </div>
-                         <p className="text-slate-600 leading-relaxed text-sm flex-1">{existing.review_text}</p>
+                         <p className="text-slate-600 leading-relaxed text-sm flex-1">{existing.comment}</p>
                          <div className="mt-6 pt-4 border-t border-slate-100 text-right">
-                           <Button variant="outline" size="sm" onClick={() => beginEdit(b.id)} className="rounded-lg text-slate-500 hover:text-indigo-600 bg-white">Edit Your Review</Button>
+                           <Button variant="outline" size="sm" onClick={() => beginEdit(b.id)} className="rounded-lg text-slate-500 hover:text-primary bg-white">Edit Your Review</Button>
                          </div>
                        </div>
                      ) : (
@@ -185,7 +185,7 @@ export default function StudentReviewsPage() {
                          </div>
                          <h4 className="font-semibold text-slate-700 mb-1">How was this book?</h4>
                          <p className="text-sm text-slate-500 mb-6 max-w-sm">You haven't reviewed this book yet. Your feedback helps your schoolmates choose their next read.</p>
-                         <Button onClick={() => beginEdit(b.id)} className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm px-8">Write a Review</Button>
+                         <Button onClick={() => beginEdit(b.id)} className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm px-8 hover:-translate-y-0.5 transition-transform">Write a Review</Button>
                        </div>
                      )}
                   </div>

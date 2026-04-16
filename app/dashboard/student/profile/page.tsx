@@ -16,7 +16,6 @@ export default function StudentProfilePage() {
   const supabase = createClient()
   const [loading, setLoading] = React.useState(true)
   const [savingSettings, setSavingSettings] = React.useState(false)
-  const [savingPassword, setSavingPassword] = React.useState(false)
 
   // Profile data
   const [profile, setProfile] = React.useState<any>(null)
@@ -29,10 +28,6 @@ export default function StudentProfilePage() {
   // Stats
   const [totalBorrowed, setTotalBorrowed] = React.useState(0)
   const [favoriteGenre, setFavoriteGenre] = React.useState('None yet')
-
-  // Password data
-  const [newPassword, setNewPassword] = React.useState('')
-  const [confirmPassword, setConfirmPassword] = React.useState('')
 
   async function loadProfile() {
     setLoading(true)
@@ -49,11 +44,12 @@ export default function StudentProfilePage() {
       }
 
       // Load Stats
-      const { data: tx } = await supabase.from('transactions').select('books(category_id, categories(name))').eq('borrower_id', user.id)
+      const { data: tx } = await supabase.from('transactions').select('status, books(category_id, categories(name))').eq('borrower_id', user.id)
       if (tx) {
-        setTotalBorrowed(tx.length)
+        const returnedTxs = tx.filter(t => t.status === 'returned')
+        setTotalBorrowed(returnedTxs.length)
         const genreCounts: Record<string, number> = {}
-        tx.forEach(t => {
+        returnedTxs.forEach(t => {
           const g = ((t.books as any)?.categories as any)?.name
           if (g) genreCounts[g] = (genreCounts[g] || 0) + 1
         })
@@ -82,22 +78,6 @@ export default function StudentProfilePage() {
     else { toast.success('Profile updated successfully'); loadProfile() }
   }
 
-  async function handleUpdatePassword(e: React.FormEvent) {
-    e.preventDefault()
-    if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return }
-    if (newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return }
-    
-    setSavingPassword(true)
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    setSavingPassword(false)
-    
-    if (error) toast.error(error.message)
-    else {
-      toast.success('Password updated successfully')
-      setNewPassword(''); setConfirmPassword('')
-    }
-  }
-
   if (loading) return <div className="p-6"><Skeleton className="h-[400px] max-w-4xl mx-auto rounded-2xl" /></div>
   if (!profile) return <div className="p-6 text-center text-slate-500">Could not load profile.</div>
 
@@ -112,7 +92,7 @@ export default function StudentProfilePage() {
         <div className="flex-1 text-center md:text-left space-y-2">
            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{fullName}</h1>
            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-             <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 px-3 py-1 shadow-none tracking-wide"><Shield className="size-3.5 mr-1.5"/> STUDENT</Badge>
+             <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 px-3 py-1 shadow-none tracking-wide"><Shield className="size-3.5 mr-1.5"/> STUDENT</Badge>
              {profile.student_id && <Badge variant="outline" className="text-slate-600 px-3 py-1 bg-slate-50 border-slate-200"><Hash className="size-3.5 mr-1 text-slate-400"/> ID: {profile.student_id}</Badge>}
            </div>
            
@@ -133,7 +113,7 @@ export default function StudentProfilePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2"><User className="size-5 text-emerald-600" /> Personal Details</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2"><User className="size-5 text-primary" /> Personal Details</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpdateProfile} className="space-y-4">
@@ -160,36 +140,47 @@ export default function StudentProfilePage() {
                 <Label>School Email <span className="text-slate-400 text-xs font-normal">(Read-only)</span></Label>
                 <Input value={email} readOnly className="rounded-xl bg-slate-100 border-transparent text-slate-500 cursor-not-allowed" />
               </div>
-              <Button type="submit" disabled={savingSettings} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white mt-2 shadow-sm shadow-emerald-200">
+              <Button type="submit" disabled={savingSettings} className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground mt-2 shadow-sm shadow-primary/20 transition-all hover:-translate-y-0.5">
                 {savingSettings ? 'Saving...' : 'Save Profile'}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-slate-200 shadow-sm">
+        <Card className="rounded-2xl border-slate-200 shadow-sm bg-gradient-to-br from-primary/5 to-white">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2"><Key className="size-5 text-emerald-600" /> Security</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2 text-primary"><BookOpen className="size-5 text-primary" /> Reading Statistics</CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpdatePassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label>New Password</Label>
-                <Input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} required minLength={6} className="rounded-xl bg-slate-50 border-slate-200 focus-visible:bg-white transition-colors" />
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <div className="size-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <BookOpen className="size-6" />
               </div>
-              <div className="space-y-2">
-                <Label>Confirm New Password</Label>
-                <Input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required minLength={6} className="rounded-xl bg-slate-50 border-slate-200 focus-visible:bg-white transition-colors" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Books Read</p>
+                <p className="text-2xl font-black text-slate-900">{totalBorrowed}</p>
               </div>
-              <div className="pt-2">
-                <p className="text-xs text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  You will be logged out of other devices after changing your password. Keep your password safe and don't share it with other students.
-                </p>
-                <Button type="submit" disabled={savingPassword} className="w-full rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-emerald-700 shadow-sm">
-                  {savingPassword ? 'Updating...' : 'Update Password'}
-                </Button>
+            </div>
+            
+            <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <div className="size-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                <Star className="size-6 fill-amber-400" />
               </div>
-            </form>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Favorite Genre</p>
+                <p className="text-xl font-bold text-slate-900">{favoriteGenre}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <div className="size-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                <CalendarDays className="size-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Member Since</p>
+                <p className="text-lg font-bold text-slate-900">{profile?.created_at ? format(new Date(profile.created_at), 'MMMM yyyy') : 'Recently'}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

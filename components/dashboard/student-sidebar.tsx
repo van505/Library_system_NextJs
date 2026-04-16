@@ -43,11 +43,11 @@ function NavItem({ item, onClick }: { item: NavItemConfig, onClick?: () => void 
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 mx-2 rounded-xl text-sm font-medium transition-all group relative',
         isActive
-          ? 'bg-indigo-600 text-white shadow-sm'
+          ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
           : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       )}
     >
-      <item.icon className={cn('size-4 shrink-0 transition-colors', isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-400')} />
+      <item.icon className={cn('size-4 shrink-0 transition-colors', isActive ? 'text-primary-foreground' : 'text-slate-500 group-hover:text-primary')} />
       <span>{item.label}</span>
     </Link>
   )
@@ -68,13 +68,13 @@ function SidebarContent({ profile, onNavClick }: { profile: any, onNavClick?: ()
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 text-slate-300">
       <div className="flex items-center gap-3 px-6 h-16 shrink-0 border-b border-slate-800">
-        <div className="size-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-600/20">
-          <BookOpen className="size-4 text-white" />
+        <div className="size-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-sm shadow-primary/20 transition-colors">
+          <BookOpen className="size-4 text-primary-foreground" />
         </div>
         <div>
           <p className="font-bold text-white tracking-tight leading-none">SchoolLib</p>
           <p className="text-[10px] text-slate-500 font-medium tracking-wide flex items-center gap-1 mt-0.5">
-            <GraduationCap className="size-3 text-indigo-400" />
+            <GraduationCap className="size-3 text-primary" />
             STUDENT PANEL
           </p>
         </div>
@@ -93,11 +93,11 @@ function SidebarContent({ profile, onNavClick }: { profile: any, onNavClick?: ()
 
       <div className="p-4 border-t border-slate-800 bg-slate-900/50">
         <div className="flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 p-2 rounded-xl transition-colors">
-          <div className="size-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="size-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 overflow-hidden text-primary">
             {profile?.avatar_url ? (
               <img src={profile.avatar_url} alt="Avatar" className="size-full rounded-full object-cover" />
             ) : (
-              <span className="text-xs font-bold text-indigo-300">{(profile?.full_name ?? 'S').charAt(0).toUpperCase()}</span>
+              <span className="text-xs font-bold uppercase">{(profile?.full_name ?? 'S').charAt(0)}</span>
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -130,7 +130,7 @@ export default function StudentSidebar({ profile }: { profile: any }) {
           <Menu className="size-5" />
         </button>
         <div className="ml-4 flex items-center gap-2">
-           <BookOpen className="size-5 text-indigo-600" />
+           <BookOpen className="size-5 text-primary" />
            <span className="font-bold text-slate-900">SchoolLib</span>
         </div>
       </div>

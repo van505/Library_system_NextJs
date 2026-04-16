@@ -58,28 +58,35 @@ export default function StudentDashboard() {
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-3xl p-6 md:p-10 text-white shadow-xl shadow-emerald-200 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
+      <div className="bg-slate-900 rounded-3xl p-6 md:p-10 text-white shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
+        
+        {/* Glassmorphic Ambient Glow & Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 z-0"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary opacity-20 blur-3xl rounded-full translate-x-1/3 -translate-y-1/3 z-0 transition-transform duration-1000 group-hover:scale-110"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary opacity-10 blur-3xl rounded-full -translate-x-1/2 translate-y-1/2 z-0"></div>
+        
+        <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none z-0">
           <BookOpen className="size-64 -rotate-12 translate-x-12 -translate-y-12" />
         </div>
+
         <div className="flex items-center gap-6 relative z-10 w-full md:w-auto">
-           <div className="size-20 rounded-full bg-white/20 border-4 border-white/40 flex items-center justify-center text-2xl font-bold backdrop-blur-sm shrink-0">
+           <div className="size-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-2xl font-bold backdrop-blur-md shadow-lg shrink-0">
              {initials}
            </div>
            <div>
-             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1">Welcome back, {profile?.full_name?.split(' ')[0]}!</h1>
-             <p className="text-emerald-100 flex items-center gap-2">
-                {profile?.student_id && <Badge className="bg-white/20 hover:bg-white/30 text-white border-transparent">ID: {profile.student_id}</Badge>}
+             <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2 opacity-95">Welcome back, {profile?.full_name?.split(' ')[0]}!</h1>
+             <p className="text-slate-300 font-medium flex-wrap flex items-center gap-2">
+                {profile?.student_id && <Badge className="bg-white/10 hover:bg-white/20 text-white border-white/10 border backdrop-blur-sm shadow-none font-semibold">ID: {profile.student_id}</Badge>}
                 Ready to explore new worlds today?
              </p>
            </div>
         </div>
-        <div className="flex gap-3 w-full md:w-auto relative z-10 shrink-0">
-          <Button asChild variant="secondary" className="rounded-xl flex-1 md:flex-none text-emerald-700 font-semibold shadow-sm hover:shadow-md transition-all">
-            <Link href="/dashboard/student/browse"><Search className="size-4 mr-2" /> Browse</Link>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto relative z-10 shrink-0">
+          <Button asChild className="rounded-xl flex-1 md:flex-none bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:-translate-y-1 hover:shadow-xl transition-all h-12 px-6">
+            <Link href="/dashboard/student/browse"><Search className="size-4 mr-2" /> Browse Catalog</Link>
           </Button>
-          <Button asChild className="rounded-xl flex-1 md:flex-none bg-white/20 hover:bg-white/30 border-transparent text-white font-semibold backdrop-blur-sm shadow-none">
-            <Link href="/chat"><Sparkles className="size-4 mr-2" /> Ask Libby AI</Link>
+          <Button asChild className="rounded-xl flex-1 md:flex-none bg-white/10 hover:bg-white/20 border border-white/10 text-white font-semibold backdrop-blur-md shadow-none hover:-translate-y-1 transition-all h-12 px-6">
+            <Link href="/chat"><Sparkles className="size-4 mr-2 text-amber-300" /> Ask Libby AI</Link>
           </Button>
         </div>
       </div>
@@ -114,18 +121,18 @@ export default function StudentDashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Books Borrowed', v: stats.total, icon: History, c: 'text-blue-600 bg-blue-50 border-blue-100' },
-          { label: 'Currently Active', v: stats.active, icon: BookOpen, c: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+          { label: 'Books Borrowed', v: stats.total, icon: History, c: 'text-primary bg-primary/10 border-primary/20' },
+          { label: 'Currently Active', v: stats.active, icon: BookOpen, c: 'text-blue-600 bg-blue-50 border-blue-100' },
           { label: 'Books Returned', v: stats.returned, icon: CheckCircle, c: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
           { label: 'Overdue Books', v: stats.overdue, icon: AlertTriangle, c: `text-red-600 ${stats.overdue > 0 ? 'bg-red-50 border-red-200 shadow-sm shadow-red-100' : 'bg-slate-50 border-slate-100 text-slate-400'}` }
         ].map((s,i) => (
-          <Card key={i} className={`border rounded-2xl ${s.c}`}>
+          <Card key={i} className={`border rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${s.c}`}>
             <CardContent className="p-5">
               <div className="flex justify-between items-start mb-2">
                  <div className={`p-2.5 rounded-xl bg-white shadow-sm shrink-0`}>
                     <s.icon className="size-5" />
                  </div>
-                 <p className="text-3xl font-bold">{s.v}</p>
+                 <p className="text-4xl font-black">{s.v}</p>
               </div>
               <p className="text-xs font-bold uppercase tracking-wider opacity-80 mt-4">{s.label}</p>
             </CardContent>
