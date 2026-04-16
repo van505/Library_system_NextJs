@@ -7,7 +7,6 @@ import { createServiceSupabaseClient } from '@/lib/supabase-server'
  * to bypass RLS.
  */
 export async function notifyAdmins(
-  _client: any, // Deprecated: Kept for backward compatibility with calling routes
   title: string,
   message: string,
   link?: string

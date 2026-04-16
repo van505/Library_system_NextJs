@@ -162,7 +162,6 @@ export default function StaffShelvesPage() {
     else {
       toast.success(isEditing ? 'Shelf updated' : 'Shelf created')
       await notifyAdmins(
-        supabase,
         isEditing ? `${staffProfile?.full_name ?? 'Staff'} edited a shelf` : `${staffProfile?.full_name ?? 'Staff'} added a shelf`,
         isEditing ? `Updated shelf "${name}" (${location}).` : `Added new shelf "${name}" at ${location}.`,
         '/dashboard/admin/shelves'
@@ -183,7 +182,7 @@ export default function StaffShelvesPage() {
     if (error) toast.error(error.message)
     else {
       toast.success('Shelf deleted')
-      await notifyAdmins(supabase, `${staffProfile?.full_name ?? 'Staff'} deleted a shelf`, `Deleted shelf "${target?.name ?? 'a shelf'}".`, '/dashboard/admin/shelves')
+      await notifyAdmins(`${staffProfile?.full_name ?? 'Staff'} deleted a shelf`, `Deleted shelf "${target?.name ?? 'a shelf'}".`, '/dashboard/admin/shelves')
       loadData()
     }
   }

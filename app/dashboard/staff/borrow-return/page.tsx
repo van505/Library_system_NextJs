@@ -155,7 +155,7 @@ export default function StaffTransactionsPage() {
         `"${selectedBook.title}" has been issued to you. Due: ${format(new Date(dueDate), 'MMM d, yyyy')}.`,
         'info', '/dashboard/student/requests'
       )
-      await notifyAdmins(supabase,
+      await notifyAdmins(
         `${staffProfile?.full_name ?? 'Staff'} issued a book`,
         `Issued "${selectedBook.title}" to ${selectedStudent.full_name}.`,
         '/dashboard/admin/borrow-return'
@@ -228,7 +228,7 @@ export default function StaffTransactionsPage() {
     }
 
     const studentName = r.profile?.full_name ?? 'a student'
-    await notifyAdmins(supabase,
+    await notifyAdmins(
       `${staffProfile?.full_name ?? 'Staff'} approved a reservation`,
       `Approved ${studentName}'s request for "${bookTitle}".`,
       '/dashboard/admin/borrow-return'
@@ -289,7 +289,7 @@ export default function StaffTransactionsPage() {
     }
 
     const studentName = editTarget.profile?.full_name ?? 'a student'
-    await notifyAdmins(supabase,
+    await notifyAdmins(
       `${staffProfile?.full_name ?? 'Staff'} approved a reservation (date adjusted)`,
       `Approved ${studentName}'s request for "${bookTitle}" with adjusted return date.`,
       '/dashboard/admin/borrow-return'

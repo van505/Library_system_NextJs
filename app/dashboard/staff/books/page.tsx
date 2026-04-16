@@ -366,7 +366,6 @@ export default function StaffBooksPage() {
       loadData()
       // Phase 9: notify admins
       await notifyAdmins(
-        supabase,
         isEditing ? `${staffProfile?.full_name ?? 'Staff'} edited a book` : `${staffProfile?.full_name ?? 'Staff'} added a book`,
         isEditing ? `Updated "${title}" in the catalog.` : `Added "${title}" by ${author} to the catalog.`,
         '/dashboard/admin/books'
@@ -385,7 +384,7 @@ export default function StaffBooksPage() {
     if (error) toast.error(error.message)
     else {
       toast.success('Book deleted')
-      await notifyAdmins(supabase, `${staffProfile?.full_name ?? 'Staff'} deleted a book`, `Deleted "${target?.title ?? 'a book'}" from the catalog.`, '/dashboard/admin/books')
+      await notifyAdmins(`${staffProfile?.full_name ?? 'Staff'} deleted a book`, `Deleted "${target?.title ?? 'a book'}" from the catalog.`, '/dashboard/admin/books')
       loadData(); setSelectedIds(new Set())
     }
   }
