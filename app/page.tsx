@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import type { Book, Profile } from '@/lib/supabase'
+import { getStudentCount } from '@/app/actions/stats'
 
 type BookWithShelf = Book & { shelves?: { name: string; location: string } | null }
 type Announcement = { id: string; title: string; content: string; type: string; created_at: string }
@@ -28,11 +29,11 @@ export default function HomePage() {
 
   React.useEffect(() => {
     async function load() {
-      const [bRes, sRes, uRes, aRes, authRes] = await Promise.all([
+      const [bRes, sRes, studentCount, aRes, authRes] = await Promise.all([
         supabase.from('books').select('*, shelves(name, location)').order('created_at', { ascending: false }),
         supabase.from('shelves').select('id', { count: 'exact' }),
-        supabase.from('profiles').select('id', { count: 'exact' }).eq('role', 'student'),
-        supabase.from('announcements').select('*').eq('is_active', true).order('created_at', { ascending: false }),
+        getStudentCount(),
+        supabase.from('announcements').select('*').eq('is_active', true).eq('show_on_landing', true).order('created_at', { ascending: false }),
         supabase.auth.getUser()
       ])
 
@@ -42,7 +43,7 @@ export default function HomePage() {
         books: allBooks.reduce((acc, b) => acc + (b.total_copies ?? 1), 0),
         available: allBooks.filter(b => b.available_copies > 0).length,
         shelves: sRes.count ?? 0,
-        students: uRes.count ?? 0,
+        students: studentCount,
       })
       setAnnouncements(aRes.data ?? [])
 

@@ -1,43 +1,22 @@
 'use client'
 
 import * as React from 'react'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Search, Plus, Archive, Trash2 } from 'lucide-react'
-import { format, isPast, differenceInDays, addDays } from 'date-fns'
+import { ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Archive, Trash2, Download } from 'lucide-react'
+import { format, isPast, differenceInDays } from 'date-fns'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 export default function AdminTransactionsPage() {
   const supabase = createClient()
   const [transactions, setTransactions] = React.useState<any[]>([])
   const [loading, setLoading] = React.useState(true)
-  const [tab, setTab] = React.useState('all') // all, borrowed, returned, overdue
+  const [tab, setTab] = React.useState('all')
 
-  // Borrow Modal
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [studentSearch, setStudentSearch] = React.useState('')
-  const [bookSearch, setBookSearch] = React.useState('')
-  
-  // Selected Data for Borrowing
-  const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
-  const [selectedBook, setSelectedBook] = React.useState<any | null>(null)
-  const [dueDate, setDueDate] = React.useState(format(addDays(new Date(), 14), 'yyyy-MM-dd'))
-  const [notes, setNotes] = React.useState('')
-  const [borrowing, setBorrowing] = React.useState(false)
-
-  // Live Search Results
-  const [studentResults, setStudentResults] = React.useState<any[]>([])
-  const [bookResults, setBookResults] = React.useState<any[]>([])
-  // Archive / Delete actions
   const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; label: string } | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; bookId: string; status: string; label: string } | null>(null)
 
@@ -53,104 +32,13 @@ export default function AdminTransactionsPage() {
 
   React.useEffect(() => { loadTransactions() }, [supabase])
 
-  // Search all profiles by full_name (email is in auth.users, not profiles table)
-  React.useEffect(() => {
-    if (!studentSearch.trim()) { setStudentResults([]); return }
-    supabase.from('profiles')
-      .select('id, full_name, student_id, contact_number, role')
-      .ilike('full_name', `%${studentSearch}%`)
-      .limit(10)
-      .then(({ data }) => setStudentResults(data ?? []))
-  }, [studentSearch, supabase])
-
-  React.useEffect(() => {
-    if (!bookSearch.trim()) { setBookResults([]); return }
-    supabase.from('books')
-      .select('id, title, author, available_copies')
-      .gt('available_copies', 0)
-      .ilike('title', `%${bookSearch}%`)
-      .limit(8)
-      .then(({ data }) => setBookResults(data ?? []))
-  }, [bookSearch, supabase])
-
-  function resetBorrow() {
-    setSelectedStudent(null); setSelectedBook(null)
-    setStudentSearch(''); setBookSearch('')
-    setDueDate(format(addDays(new Date(), 14), 'yyyy-MM-dd')); setNotes(''); setIsOpen(true)
-  }
-
-  async function handleBorrowSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedStudent || !selectedBook) { toast.error('Please select both a student and a valid book.'); return }
-    setBorrowing(true)
-
-    // Insert Transaction
-    const { error: txError } = await supabase.from('transactions').insert({
-      book_id: selectedBook.id,
-      borrower_id: selectedStudent.id,
-      status: 'borrowed', // Note: borrower_id implies user_id from spec, our original schema used borrower_id
-      due_date: dueDate,
-      notes: notes || null
-    })
-
-    if (!txError) {
-      // Decrement book inventory
-      await supabase.from('books').update({ available_copies: selectedBook.available_copies - 1 }).eq('id', selectedBook.id)
-      
-      // Notify student
-      await supabase.from('notifications').insert({
-        user_id: selectedStudent.id,
-        title: 'Book Borrowed',
-        message: `You have borrowed "${selectedBook.title}". Due date: ${format(new Date(dueDate), 'MMM d, yyyy')}.`,
-        type: 'info',
-        link: '/dashboard/student/borrowed'
-      })
-
-      toast.success('Book successfully borrowed out!')
-      setIsOpen(false)
-      loadTransactions()
-    } else toast.error(txError.message)
-
-    setBorrowing(false)
-  }
-
-  // BUG 1 FIX: Use LEAST to cap available_copies at total_copies on return
-  async function handleMarkReturned(txId: string, bookId: string, studentId: string | null) {
-    const { error: markErr } = await supabase
-      .from('transactions')
-      .update({ status: 'returned', returned_at: new Date().toISOString() })
-      .eq('id', txId)
-    if (!markErr) {
-      const { data: b } = await supabase
-        .from('books')
-        .select('available_copies, total_copies')
-        .eq('id', bookId)
-        .single()
-      if (b) {
-        await supabase.from('books')
-          .update({ available_copies: Math.min(b.available_copies + 1, b.total_copies) })
-          .eq('id', bookId)
-      }
-      if (studentId) {
-        await supabase.from('notifications').insert({
-          user_id: studentId, title: 'Book Returned',
-          message: 'Thank you! The book has been marked as returned.',
-          type: 'success', link: '/dashboard/student/borrowed'
-        })
-      }
-      toast.success('Transaction marked as returned.')
-      loadTransactions()
-    } else toast.error(markErr.message)
-  }
-
   async function handleArchive() {
     if (!archiveTarget) return
     await supabase.from('transactions').update({ is_archived: true }).eq('id', archiveTarget.id)
-    toast.success(`Archived.`)
+    toast.success('Archived.')
     setArchiveTarget(null); loadTransactions()
   }
 
-  // Correction 3: safe re-increment on delete if book was borrowed
   async function handleDelete() {
     if (!deleteTarget) return
     if (deleteTarget.status === 'borrowed') {
@@ -158,16 +46,45 @@ export default function AdminTransactionsPage() {
       if (bk) await supabase.from('books').update({ available_copies: Math.min(bk.available_copies + 1, bk.total_copies) }).eq('id', deleteTarget.bookId)
     }
     await supabase.from('transactions').delete().eq('id', deleteTarget.id)
-    toast.success(`Permanently deleted.`)
+    toast.success('Permanently deleted.')
     setDeleteTarget(null); loadTransactions()
   }
 
-  // Filtering
+  function exportToCSV() {
+    const rows = filtered
+    const fmt = (d: string | null) => d ? format(new Date(d), 'yyyy-MM-dd HH:mm:ss') : ''
+    const headers = ['Student Name', 'Student ID', 'Book Title', 'Author', 'Shelf', 'Status', 'Borrowed At', 'Due Date', 'Returned At']
+    const csvRows = rows.map(t => {
+      const p = t.profiles as any
+      const b = t.books as any
+      return [
+        p?.full_name ?? '',
+        p?.student_id ?? '',
+        b?.title ?? '',
+        b?.author ?? '',
+        b?.shelves?.name ?? '',
+        t.status,
+        fmt(t.borrowed_at),
+        fmt(t.due_date),
+        fmt(t.returned_at),
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    })
+    const csvContent = [headers.join(','), ...csvRows].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `transactions_${format(new Date(), 'yyyy-MM-dd')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${rows.length} records to CSV.`)
+  }
+
   const filtered = transactions.filter(t => {
     if (tab === 'all') return true
-    if (tab === 'borrowed') return t.status === 'borrowed' && !isPast(new Date(t.due_date))
+    if (tab === 'borrowed') return t.status === 'borrowed' && t.due_date && !isPast(new Date(t.due_date))
     if (tab === 'returned') return t.status === 'returned'
-    if (tab === 'overdue') return t.status === 'borrowed' && isPast(new Date(t.due_date))
+    if (tab === 'overdue') return t.status === 'borrowed' && t.due_date && isPast(new Date(t.due_date))
     return true
   })
 
@@ -175,94 +92,18 @@ export default function AdminTransactionsPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Transactions Ledger</h1>
-          <p className="text-slate-500 text-sm mt-1">Track all borrowing and return activity across the library.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Transaction Audit Log</h1>
+          <p className="text-slate-500 text-sm mt-1">Complete transaction history and records. Use Borrow/Return to process active operations.</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2" onClick={resetBorrow}><Plus className="size-4" /> Issue Book (Borrow)</Button>
-          </DialogTrigger>
-          <DialogContent className="rounded-2xl sm:max-w-[500px]">
-            <DialogHeader><DialogTitle>Issue Book to Student</DialogTitle></DialogHeader>
-            <DialogDescription className="sr-only">Dialog</DialogDescription>
-            <form onSubmit={handleBorrowSubmit} className="space-y-4 mt-2">
-              
-              <div className="space-y-2">
-                <Label>Student Search</Label>
-                {selectedStudent ? (
-                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-emerald-800 text-sm">
-                    <div><b>{selectedStudent.full_name}</b> <span className="opacity-70">({selectedStudent.email})</span></div>
-                    <Button type="button" variant="ghost" size="sm" onClick={()=>setSelectedStudent(null)}>Change</Button>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                      <Input autoComplete="off" className="pl-9 rounded-xl" placeholder="Type any part of name..." value={studentSearch} onChange={e => setStudentSearch(e.target.value)} />
-                    </div>
-                    {studentSearch.trim() && (
-                      <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
-                        {studentResults.length === 0 ? (
-                          <p className="text-sm text-slate-400 text-center py-3">No profiles found for &ldquo;{studentSearch}&rdquo;</p>
-                        ) : studentResults.map(s => (
-                          <div key={s.id} className="p-2.5 text-sm hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-100 last:border-0" onClick={() => { setSelectedStudent(s); setStudentSearch('') }}>
-                            <span className="font-medium text-slate-800">{s.full_name}</span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${ s.role === 'student' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }`}>{s.role}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Book Search</Label>
-                {selectedBook ? (
-                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-emerald-800 text-sm">
-                    <div><b>{selectedBook.title}</b> <span className="opacity-70">({selectedBook.author})</span></div>
-                    <Button type="button" variant="ghost" size="sm" onClick={()=>setSelectedBook(null)}>Change</Button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
-                    <Input className="pl-9 rounded-xl" placeholder="Type title... (Available only)" value={bookSearch} onChange={e=>setBookSearch(e.target.value)} />
-                    {bookResults.length > 0 && (
-                      <Card className="absolute top-full left-0 w-full mt-1 z-50 p-1">
-                        {bookResults.map(b => (
-                          <div key={b.id} className="p-2 text-sm hover:bg-slate-100 rounded-lg cursor-pointer flex justify-between" onClick={()=>{setSelectedBook(b); setBookSearch('')}}>
-                            <span className="font-medium">{b.title} <span className="text-slate-500 font-normal">by {b.author}</span></span>
-                            <span className="text-emerald-600 bg-emerald-50 px-2 rounded">{b.available_copies} avail</span>
-                          </div>
-                        ))}
-                      </Card>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Due Date</Label>
-                <Input type="date" required value={dueDate} onChange={e=>setDueDate(e.target.value)} className="rounded-xl" />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Notes (Optional)</Label>
-                <Textarea value={notes} onChange={e=>setNotes(e.target.value)} className="rounded-xl resize-none" rows={2} />
-              </div>
-
-              <Button type="submit" disabled={borrowing || !selectedStudent || !selectedBook} className="w-full bg-indigo-600 text-white rounded-xl">
-                {borrowing ? 'Processing...' : 'Confirm Issuance'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={exportToCSV} variant="outline" className="gap-2 rounded-xl border-slate-200 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300">
+          <Download className="size-4" /> Export CSV
+        </Button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="bg-slate-100 rounded-xl p-1 mb-4 border border-slate-200">
           <TabsTrigger value="all" className="rounded-lg tabular-nums">All Records</TabsTrigger>
-          <TabsTrigger value="borrowed" className="rounded-lg tabular-nums">Active Borrowed</TabsTrigger>
+          <TabsTrigger value="borrowed" className="rounded-lg tabular-nums">Active</TabsTrigger>
           <TabsTrigger value="returned" className="rounded-lg tabular-nums">Returned</TabsTrigger>
           <TabsTrigger value="overdue" className="rounded-lg tabular-nums text-red-600 data-[state=active]:text-red-700 data-[state=active]:bg-red-50">Overdue</TabsTrigger>
         </TabsList>
@@ -275,8 +116,8 @@ export default function AdminTransactionsPage() {
               <th className="p-4 font-semibold">Student</th>
               <th className="p-4 font-semibold">Book Info</th>
               <th className="p-4 font-semibold">Timeline</th>
-              <th className="p-4 font-semibold">Status / Due</th>
-              <th className="p-4 font-semibold text-right">Actions</th>
+              <th className="p-4 font-semibold">Status</th>
+              <th className="p-4 font-semibold text-right">Admin Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -289,12 +130,12 @@ export default function AdminTransactionsPage() {
               const p = t.profiles as any
               const isOverdue = t.status === 'borrowed' && t.due_date && isPast(new Date(t.due_date))
               const daysDiff = t.due_date ? differenceInDays(new Date(t.due_date), new Date()) : 0
-              
+
               let statusEl = <span className="text-slate-500">-</span>
               if (t.status === 'returned') statusEl = <Badge className="bg-slate-100 text-slate-600 border-transparent hover:bg-slate-100">Returned</Badge>
-              else if (isOverdue) statusEl = <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-50"><AlertTriangle className="size-3 mr-1"/> Overdue by {Math.abs(daysDiff)} days</Badge>
-              else if (daysDiff <= 3) statusEl = <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50"><Clock className="size-3 mr-1"/> Due in {daysDiff} days</Badge>
-              else statusEl = <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50"><CheckCircle className="size-3 mr-1"/> {daysDiff} days left</Badge>
+              else if (isOverdue) statusEl = <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-50"><AlertTriangle className="size-3 mr-1"/> Overdue {Math.abs(daysDiff)}d</Badge>
+              else if (daysDiff <= 3) statusEl = <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50"><Clock className="size-3 mr-1"/> Due in {daysDiff}d</Badge>
+              else statusEl = <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50"><CheckCircle className="size-3 mr-1"/> {daysDiff}d left</Badge>
 
               return (
                 <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
@@ -310,34 +151,30 @@ export default function AdminTransactionsPage() {
                   </td>
                   <td className="p-4 align-top text-xs text-slate-600 space-y-1">
                     <div className="flex gap-2">
-                       <span className="w-16 text-slate-400">Borrowed:</span> 
-                       <span className="font-medium text-slate-900">{t.borrowed_at ? format(new Date(t.borrowed_at), 'MMM d, yyyy') : '-'}</span>
+                      <span className="w-16 text-slate-400">Borrowed:</span>
+                      <span className="font-medium text-slate-900">{t.borrowed_at ? format(new Date(t.borrowed_at), 'MMM d, yyyy') : '-'}</span>
                     </div>
+                    {t.due_date && (
+                      <div className="flex gap-2">
+                        <span className="w-16 text-slate-400">Due:</span>
+                        <span className="font-medium text-slate-900">{format(new Date(t.due_date), 'MMM d, yyyy')}</span>
+                      </div>
+                    )}
                     {t.returned_at && (
                       <div className="flex gap-2">
-                        <span className="w-16 text-slate-400">Returned:</span> 
+                        <span className="w-16 text-slate-400">Returned:</span>
                         <span className="font-medium text-slate-900">{format(new Date(t.returned_at), 'MMM d, yyyy')}</span>
                       </div>
                     )}
                   </td>
-                  <td className="p-4 align-top">
-                    {statusEl}
-                    {t.status === 'borrowed' && <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Due: {t.due_date}</p>}
-                  </td>
-                  <td className="p-4 text-right align-top space-y-1.5">
-                    {t.status === 'borrowed' ? (
-                      <Button size="sm" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 block w-full" onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>
-                        Mark Returned
+                  <td className="p-4 align-top">{statusEl}</td>
+                  <td className="p-4 text-right align-top">
+                    <div className="flex gap-1 justify-end">
+                      <Button size="sm" variant="ghost" className="text-amber-600 hover:bg-amber-50 gap-1" title="Archive" onClick={() => setArchiveTarget({ id: t.id, label: book?.title ?? 'record' })}>
+                        <Archive className="size-3.5" />
                       </Button>
-                    ) : (
-                      <span className="text-xs text-slate-400 italic">No action needed</span>
-                    )}
-                    <div className="flex gap-1 justify-end mt-1">
-                      <Button size="sm" variant="ghost" className="text-amber-600 hover:bg-amber-50 gap-1" onClick={() => setArchiveTarget({ id: t.id, label: book?.title ?? 'record' })}>
-                        <Archive className="size-3" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 gap-1" onClick={() => setDeleteTarget({ id: t.id, bookId: t.book_id, status: t.status, label: book?.title ?? 'record' })}>
-                        <Trash2 className="size-3" />
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 gap-1" title="Delete permanently" onClick={() => setDeleteTarget({ id: t.id, bookId: t.book_id, status: t.status, label: book?.title ?? 'record' })}>
+                        <Trash2 className="size-3.5" />
                       </Button>
                     </div>
                   </td>
@@ -353,7 +190,7 @@ export default function AdminTransactionsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Archive this record?</AlertDialogTitle>
-            <AlertDialogDescription>&ldquo;{archiveTarget?.label}&rdquo; will be moved to the archive. It can be restored later.</AlertDialogDescription>
+            <AlertDialogDescription>&ldquo;{archiveTarget?.label}&rdquo; will be moved to the archive and hidden from this view.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -368,7 +205,7 @@ export default function AdminTransactionsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-red-600">Permanently delete?</AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{deleteTarget?.label}&rdquo; will be <strong>permanently deleted</strong>. This cannot be undone.
+              &ldquo;{deleteTarget?.label}&rdquo; will be <strong>permanently deleted</strong>. This cannot be undone. If the book was borrowed, inventory will be restored.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

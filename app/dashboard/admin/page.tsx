@@ -44,6 +44,7 @@ export default function AdminDashboard() {
   const [newAnnTitle, setNewAnnTitle] = React.useState('')
   const [newAnnContent, setNewAnnContent] = React.useState('')
   const [newAnnType, setNewAnnType] = React.useState('info')
+  const [newAnnLanding, setNewAnnLanding] = React.useState(false)
   const [submittingAnn, setSubmittingAnn] = React.useState(false)
 
   async function loadData() {
@@ -77,14 +78,9 @@ export default function AdminDashboard() {
       { name: 'Borrowed', value: borrowedCount }
     ])
 
-    // Books by Genre (using categories table)
-    const { data: booksWithCats } = await supabase.from('books').select('category_id, categories(name)')
-    const genreCounts: Record<string, number> = {}
-    booksWithCats?.forEach(b => {
-      const g = (b.categories as any)?.name || 'Uncategorized'
-      genreCounts[g] = (genreCounts[g] || 0) + 1
-    })
-    setGenreData(Object.entries(genreCounts).map(([name, count]) => ({ name, count })).sort((a,b) => b.count - a.count))
+    // Books by Category — use RPC for accurate pivot join
+    const { data: catData } = await supabase.rpc('get_books_by_category')
+    setGenreData((catData ?? []).map((c: any) => ({ name: c.name, count: Number(c.count) })))
 
     // Recent Transactions
     const { data: txData } = await supabase.from('transactions')
@@ -92,12 +88,19 @@ export default function AdminDashboard() {
       .order('borrowed_at', { ascending: false }).limit(5)
     setRecentTx(txData ?? [])
 
-    // Pending Requests
+    // Pending Requests — two-step to avoid FK join issues
     const { data: reqData } = await supabase.from('book_requests')
-      .select('id, book_title, created_at, user_id, profiles!inner(full_name)')
+      .select('id, book_title, created_at, user_id')
       .eq('status', 'pending')
       .order('created_at', { ascending: false }).limit(5)
-    setPendingReqs(reqData ?? [])
+    if (reqData && reqData.length > 0) {
+      const uids = [...new Set(reqData.map((r: any) => r.user_id).filter(Boolean))]
+      const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', uids)
+      const profMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p]))
+      setPendingReqs(reqData.map((r: any) => ({ ...r, profiles: profMap[r.user_id] ?? null })))
+    } else {
+      setPendingReqs([])
+    }
 
     // Active Announcements
     loadAnnouncements()
@@ -148,12 +151,14 @@ export default function AdminDashboard() {
       title: newAnnTitle,
       content: newAnnContent,
       type: newAnnType,
-      is_active: true
+      is_active: true,
+      show_on_landing: newAnnLanding,
     })
     if (!error) {
       toast.success('Announcement added.')
       setNewAnnTitle('')
       setNewAnnContent('')
+      setNewAnnLanding(false)
       loadAnnouncements()
     } else toast.error(error.message)
     setSubmittingAnn(false)
@@ -326,6 +331,13 @@ export default function AdminDashboard() {
                 </SelectContent>
               </Select>
               <Textarea placeholder="Message content..." className="rounded-xl resize-none" rows={3} value={newAnnContent} onChange={e => setNewAnnContent(e.target.value)} required />
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-indigo-50/50 transition-colors">
+                <input type="checkbox" checked={newAnnLanding} onChange={e => setNewAnnLanding(e.target.checked)} className="accent-indigo-600 size-4" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Show on Landing Page</p>
+                  <p className="text-xs text-slate-500">Visible to public visitors on the homepage</p>
+                </div>
+              </label>
               <Button type="submit" disabled={submittingAnn} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl w-full">Broadcast Announcement</Button>
             </form>
           </div>

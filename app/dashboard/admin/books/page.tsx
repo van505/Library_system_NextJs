@@ -249,19 +249,23 @@ export default function AdminBooksPage() {
   const [pendingFile, setPendingFile] = React.useState<File | null>(null)
   const [saving, setSaving] = React.useState(false)
 
+  const [categoriesDbCount, setCategoriesDbCount] = React.useState(0)
+
   async function loadData() {
     setLoading(true)
-    const [bRes, sRes, cRes] = await Promise.all([
+    const [bRes, sRes, cRes, cCount] = await Promise.all([
       supabase
         .from('books')
         .select('*, shelves(name, location), book_categories(categories(*))')
         .order('created_at', { ascending: false }),
       supabase.from('shelves').select('*').order('name'),
       supabase.from('categories').select('*').order('name'),
+      supabase.from('categories').select('*', { count: 'exact', head: true }),
     ])
     setBooks((bRes.data ?? []) as BookRow[])
     setShelves(sRes.data ?? [])
     setAllCategories(cRes.data ?? [])
+    setCategoriesDbCount(cCount.count ?? 0)
     setLoading(false)
   }
 
@@ -520,7 +524,7 @@ export default function AdminBooksPage() {
           { label: 'Total', value: totalAcc, color: 'text-slate-900' },
           { label: 'Available', value: availAcc, color: 'text-emerald-600' },
           { label: 'Borrowed', value: borrowAcc, color: 'text-amber-600' },
-          { label: 'Categories', value: allCategories.length, color: 'text-indigo-600' },
+          { label: 'Categories', value: categoriesDbCount, color: 'text-indigo-600' },
         ].map(s => (
           <div key={s.label} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{s.label}</p>

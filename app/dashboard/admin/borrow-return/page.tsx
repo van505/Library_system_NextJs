@@ -74,7 +74,7 @@ export default function AdminBorrowReturnPage() {
 
     if (!reqs || reqs.length === 0) { setReservations([]); setResLoading(false); return }
     const userIds = [...new Set(reqs.map((r: any) => r.user_id).filter(Boolean))]
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name, student_id').in('id', userIds)
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name, student_id, email').in('id', userIds)
     const pm = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p]))
     setReservations(reqs.map((r: any) => ({ ...r, profile: pm[r.user_id] ?? null })))
     setResLoading(false)

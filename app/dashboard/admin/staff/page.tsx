@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch'
 import { CardDescription } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Users, Mail, Phone, Shield, ShieldAlert, Plus, Trash2 } from 'lucide-react'
+import { Users, Mail, Phone, Shield, ShieldAlert, Plus, Trash2, Search } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type StaffRow = {
   id: string
@@ -36,6 +37,12 @@ export default function AdminStaffPage() {
   const [password, setPassword] = React.useState('')
   const [role, setRole] = React.useState('staff')
   const [saving, setSaving] = React.useState(false)
+
+  // Filters
+  const [search, setSearch] = React.useState('')
+  const [roleFilter, setRoleFilter] = React.useState('all')
+  const [statusFilter, setStatusFilter] = React.useState('all')
+  const [sortBy, setSortBy] = React.useState('newest')
 
   async function loadData() {
     setLoading(true)
@@ -96,6 +103,26 @@ export default function AdminStaffPage() {
   const adminCount = staff.filter(s => s.role === 'admin').length
   const staffCount = staff.filter(s => s.role === 'staff').length
   const activeCount = staff.filter(s => s.is_active !== false).length
+
+  const filtered = React.useMemo(() => {
+    let list = [...staff]
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(s =>
+        (s.full_name ?? '').toLowerCase().includes(q) ||
+        (s.email ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (roleFilter !== 'all') list = list.filter(s => s.role === roleFilter)
+    if (statusFilter === 'active') list = list.filter(s => s.is_active !== false)
+    if (statusFilter === 'inactive') list = list.filter(s => s.is_active === false)
+    switch (sortBy) {
+      case 'newest': list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break
+      case 'oldest': list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break
+      case 'az': list.sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? '')); break
+    }
+    return list
+  }, [staff, search, roleFilter, statusFilter, sortBy])
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -166,6 +193,38 @@ export default function AdminStaffPage() {
         </div>
       )}
 
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+          <Input className="pl-9 rounded-xl bg-white border-none shadow-sm h-9" placeholder="Search name or email..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-full sm:w-[140px] rounded-xl bg-white border-none shadow-sm h-9"><SelectValue placeholder="Role" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="staff">Staff</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[140px] rounded-xl bg-white border-none shadow-sm h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-[140px] rounded-xl bg-white border-none shadow-sm h-9"><SelectValue placeholder="Sort" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest First</SelectItem>
+            <SelectItem value="oldest">Oldest First</SelectItem>
+            <SelectItem value="az">Name A → Z</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -182,14 +241,14 @@ export default function AdminStaffPage() {
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr><td colSpan={6} className="p-8 text-center"><Skeleton className="h-4 w-40 mx-auto" /></td></tr>
-            ) : staff.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="p-12 text-center text-slate-500">
                   <Users className="size-10 text-slate-300 mx-auto mb-3" />
-                  No staff members found.
+                  {search || roleFilter !== 'all' || statusFilter !== 'all' ? 'No staff match your filters.' : 'No staff members found.'}
                 </td>
               </tr>
-            ) : staff.map(s => {
+            ) : filtered.map(s => {
               const isActive = s.is_active !== false
               const initials = (s.full_name || 'U').charAt(0).toUpperCase()
               const isSelf = s.id === myId

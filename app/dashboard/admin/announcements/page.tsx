@@ -31,6 +31,7 @@ export default function AdminAnnouncementsPage() {
   const [content, setContent] = React.useState('')
   const [type, setType] = React.useState('info') // info, success, warning, danger
   const [isActive, setIsActive] = React.useState(true)
+  const [showOnLanding, setShowOnLanding] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
 
   async function loadData() {
@@ -43,7 +44,7 @@ export default function AdminAnnouncementsPage() {
   React.useEffect(() => { loadData() }, [supabase])
 
   function resetForm() {
-    setTitle(''); setContent(''); setType('info'); setIsActive(true)
+    setTitle(''); setContent(''); setType('info'); setIsActive(true); setShowOnLanding(false)
   }
 
   function openCreate() {
@@ -52,14 +53,17 @@ export default function AdminAnnouncementsPage() {
 
   function openEdit(a: any) {
     setIsEditing(true); setEditingId(a.id); setTitle(a.title); setContent(a.content)
-    setType(a.type || 'info'); setIsActive(a.is_active ?? true); setIsOpen(true)
+    setType(a.type || 'info'); 
+    setIsActive(a.is_active ?? true); 
+    setShowOnLanding(a.show_on_landing ?? false); 
+    setIsOpen(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     
-    const payload = { title, content, type, is_active: isActive }
+    const payload = { title, content, type, is_active: isActive, show_on_landing: showOnLanding }
 
     let error;
     if (isEditing && editingId) {
@@ -136,11 +140,20 @@ export default function AdminAnnouncementsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <div className="h-10 flex items-center gap-3">
-                    <Switch checked={isActive} onCheckedChange={setIsActive} />
-                    <span className="text-sm font-medium">{isActive ? 'Active (Visible)' : 'Hidden'}</span>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <div className="h-10 flex items-center gap-3">
+                      <Switch checked={isActive} onCheckedChange={setIsActive} />
+                      <span className="text-sm font-medium">{isActive ? 'Active (Visible)' : 'Hidden'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Landing Page Visibility</Label>
+                    <div className="h-10 flex items-center gap-3">
+                      <Switch checked={showOnLanding} onCheckedChange={setShowOnLanding} />
+                      <span className="text-sm font-medium">{showOnLanding ? 'Show on Public Homepage' : 'Dashboard Only'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
