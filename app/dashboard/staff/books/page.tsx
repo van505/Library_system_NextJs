@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/store'
+import { notifyAdmins } from '@/lib/notifyAdmins'
 import { toast } from 'sonner'
 import { BookOpen, Search, Plus, Trash2, Edit, Filter, X, Link as LinkIcon, Upload, ImageIcon } from 'lucide-react'
 import type { Shelf, Category } from '@/lib/supabase'
@@ -217,6 +219,7 @@ function CoverImageInput({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function StaffBooksPage() {
   const supabase = createClient()
+  const { profile: staffProfile } = useAuthStore()
   const [books, setBooks] = React.useState<BookRow[]>([])
   const [shelves, setShelves] = React.useState<Shelf[]>([])
   const [allCategories, setAllCategories] = React.useState<Category[]>([])
@@ -361,6 +364,13 @@ export default function StaffBooksPage() {
       toast.success(isEditing ? 'Book updated' : 'Book added')
       setIsOpen(false)
       loadData()
+      // Phase 9: notify admins
+      await notifyAdmins(
+        supabase,
+        isEditing ? `${staffProfile?.full_name ?? 'Staff'} edited a book` : `${staffProfile?.full_name ?? 'Staff'} added a book`,
+        isEditing ? `Updated "${title}" in the catalog.` : `Added "${title}" by ${author} to the catalog.`,
+        '/dashboard/admin/books'
+      )
     } catch (err: any) {
       toast.error(err.message || 'Failed to save book')
     } finally {
@@ -370,9 +380,14 @@ export default function StaffBooksPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this book? Historic transactions may be affected.')) return
+    const target = books.find(b => b.id === id)
     const { error } = await supabase.from('books').delete().eq('id', id)
     if (error) toast.error(error.message)
-    else { toast.success('Book deleted'); loadData(); setSelectedIds(new Set()) }
+    else {
+      toast.success('Book deleted')
+      await notifyAdmins(supabase, `${staffProfile?.full_name ?? 'Staff'} deleted a book`, `Deleted "${target?.title ?? 'a book'}" from the catalog.`, '/dashboard/admin/books')
+      loadData(); setSelectedIds(new Set())
+    }
   }
 
   async function handleBulkDelete() {

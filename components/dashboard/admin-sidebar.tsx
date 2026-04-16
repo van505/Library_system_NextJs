@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, Library, Users, ArrowLeftRight,
   Bot, LogOut, Menu, X, GraduationCap,
-  Bell, User, ClipboardList, Tag
+  Bell, User, ClipboardList, Tag, Archive
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
@@ -20,9 +20,11 @@ const adminNav: Record<string, NavItemConfig[]> = {
     { label: 'Manage Books', href: '/dashboard/admin/books', icon: BookOpen },
     { label: 'Manage Shelves', href: '/dashboard/admin/shelves', icon: Library },
     { label: 'Manage Categories', href: '/dashboard/admin/categories', icon: Tag },
+    { label: 'Borrow / Return', href: '/dashboard/admin/borrow-return', icon: ArrowLeftRight },
     { label: 'Transactions', href: '/dashboard/admin/transactions', icon: ArrowLeftRight },
     { label: 'Book Requests', href: '/dashboard/admin/requests', icon: ClipboardList },
     { label: 'Announcements', href: '/dashboard/admin/announcements', icon: Bell },
+    { label: 'Archive', href: '/dashboard/admin/archive', icon: Archive },
   ],
   STAFF: [
     { label: 'Manage Staff', href: '/dashboard/admin/staff', icon: Users },

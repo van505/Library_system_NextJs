@@ -97,6 +97,28 @@
   }
 }
 
+/* ── Dark Mode (Phase 8: full page) ──────────────────────────────── */
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --popover: #1e293b;
+  --popover-foreground: #f1f5f9;
+  --primary: #818cf8;
+  --primary-foreground: #0f172a;
+  --secondary: #334155;
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #f1f5f9;
+  --destructive: #f87171;
+  --border: #334155;
+  --input: #334155;
+  --ring: #818cf8;
+}
+
 /* ── Gradient animation for homepage ────────────────────────── */
 @keyframes gradient-flow {
   0%, 100% { background-position: 0% 50%; }

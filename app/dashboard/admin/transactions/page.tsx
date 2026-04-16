@@ -12,8 +12,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Search, Plus } from 'lucide-react'
+import { ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Search, Plus, Archive, Trash2 } from 'lucide-react'
 import { format, isPast, differenceInDays, addDays } from 'date-fns'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 export default function AdminTransactionsPage() {
   const supabase = createClient()
@@ -36,11 +37,15 @@ export default function AdminTransactionsPage() {
   // Live Search Results
   const [studentResults, setStudentResults] = React.useState<any[]>([])
   const [bookResults, setBookResults] = React.useState<any[]>([])
+  // Archive / Delete actions
+  const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; label: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; bookId: string; status: string; label: string } | null>(null)
 
   async function loadTransactions() {
     setLoading(true)
     const { data } = await supabase.from('transactions')
       .select('*, books(title, author, shelves(name, location)), profiles!borrower_id(full_name, student_id, contact_number)')
+      .eq('is_archived', false)
       .order('borrowed_at', { ascending: false })
     setTransactions(data ?? [])
     setLoading(false)
@@ -136,6 +141,25 @@ export default function AdminTransactionsPage() {
       toast.success('Transaction marked as returned.')
       loadTransactions()
     } else toast.error(markErr.message)
+  }
+
+  async function handleArchive() {
+    if (!archiveTarget) return
+    await supabase.from('transactions').update({ is_archived: true }).eq('id', archiveTarget.id)
+    toast.success(`Archived.`)
+    setArchiveTarget(null); loadTransactions()
+  }
+
+  // Correction 3: safe re-increment on delete if book was borrowed
+  async function handleDelete() {
+    if (!deleteTarget) return
+    if (deleteTarget.status === 'borrowed') {
+      const { data: bk } = await supabase.from('books').select('available_copies, total_copies').eq('id', deleteTarget.bookId).single()
+      if (bk) await supabase.from('books').update({ available_copies: Math.min(bk.available_copies + 1, bk.total_copies) }).eq('id', deleteTarget.bookId)
+    }
+    await supabase.from('transactions').delete().eq('id', deleteTarget.id)
+    toast.success(`Permanently deleted.`)
+    setDeleteTarget(null); loadTransactions()
   }
 
   // Filtering
@@ -300,14 +324,22 @@ export default function AdminTransactionsPage() {
                     {statusEl}
                     {t.status === 'borrowed' && <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Due: {t.due_date}</p>}
                   </td>
-                  <td className="p-4 text-right align-top">
+                  <td className="p-4 text-right align-top space-y-1.5">
                     {t.status === 'borrowed' ? (
-                      <Button size="sm" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:text-indigo-700 hover:bg-indigo-50" onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>
+                      <Button size="sm" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 block w-full" onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>
                         Mark Returned
                       </Button>
                     ) : (
                       <span className="text-xs text-slate-400 italic">No action needed</span>
                     )}
+                    <div className="flex gap-1 justify-end mt-1">
+                      <Button size="sm" variant="ghost" className="text-amber-600 hover:bg-amber-50 gap-1" onClick={() => setArchiveTarget({ id: t.id, label: book?.title ?? 'record' })}>
+                        <Archive className="size-3" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 gap-1" onClick={() => setDeleteTarget({ id: t.id, bookId: t.book_id, status: t.status, label: book?.title ?? 'record' })}>
+                        <Trash2 className="size-3" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               )
@@ -315,6 +347,36 @@ export default function AdminTransactionsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Archive Confirm */}
+      <AlertDialog open={!!archiveTarget} onOpenChange={open => !open && setArchiveTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this record?</AlertDialogTitle>
+            <AlertDialogDescription>&ldquo;{archiveTarget?.label}&rdquo; will be moved to the archive. It can be restored later.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive} className="bg-amber-600 hover:bg-amber-700">Archive</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">Permanently delete?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{deleteTarget?.label}&rdquo; will be <strong>permanently deleted</strong>. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete Permanently</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

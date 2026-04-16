@@ -27,6 +27,10 @@ type Reservation = {
   author: string | null
   status: string
   created_at: string
+  proposed_return_date?: string | null
+  approved_return_date?: string | null
+  return_date_edited?: boolean | null
+  staff_note?: string | null
   books?: { title: string; author: string; cover_url?: string; shelves?: { name: string } } | null
 }
 
@@ -209,6 +213,24 @@ export default function StudentRequestsPage() {
             <p className="text-xs text-slate-500 mb-2">{bk?.author ?? r.author}</p>
             {bk?.shelves?.name && <p className="text-xs text-slate-400 mb-2">📍 {bk.shelves.name}</p>}
             <p className="text-xs text-slate-400">Requested: {format(new Date(r.created_at), 'MMM d, yyyy')}</p>
+            {/* Proposed return date */}
+            {r.proposed_return_date && (
+              <p className="text-xs text-indigo-600 font-medium mt-1">
+                📅 Proposed return: {format(new Date(r.proposed_return_date + 'T00:00:00'), 'MMM d, yyyy')}
+              </p>
+            )}
+            {/* Staff-adjusted return date */}
+            {r.return_date_edited && r.approved_return_date && (
+              <p className="text-xs text-amber-600 font-medium mt-0.5">
+                ✏️ Staff adjusted to: {format(new Date(r.approved_return_date + 'T00:00:00'), 'MMM d, yyyy')}
+              </p>
+            )}
+            {/* Staff note */}
+            {r.staff_note && (
+              <p className="text-xs text-slate-500 italic mt-1 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                Staff note: {r.staff_note}
+              </p>
+            )}
             {r.status === 'pending' && (
               <p className={`text-xs mt-1 font-medium ${isExpired ? 'text-red-600' : isExpiringSoon ? 'text-amber-600' : 'text-slate-500'}`}>
                 {isExpired ? '⚠ May have expired — contact staff' : isExpiringSoon ? `⏰ Expiring soon (${Math.round(hoursOld)}h old)` : 'Awaiting staff approval'}

@@ -4,15 +4,18 @@ import * as React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
-import { Search, MapPin, BookOpen, User, Star } from 'lucide-react'
+import { Search, MapPin, BookOpen, User, Star, CalendarCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { toInputDate, getMinReturnDate, getMaxReturnDate, validateReturnDate } from '@/lib/dateUtils'
+import { notifyRoles } from '@/lib/notifyAdmins'
 
 type BookCat = { id: string; name: string; color: string; icon: string }
 type BookRow = {
@@ -45,6 +48,11 @@ export default function StudentBrowsePage() {
   const [reviews, setReviews] = React.useState<any[]>([])
   const [requesting, setRequesting] = React.useState(false)
   const [myId, setMyId] = React.useState<string | null>(null)
+
+  // ── Return date dialog ────────────────────────────────────────────────────
+  const [returnDateDialogOpen, setReturnDateDialogOpen] = React.useState(false)
+  const [proposedReturnDate, setProposedReturnDate] = React.useState('')
+  const [returnDateError, setReturnDateError] = React.useState<string | null>(null)
 
   async function loadData() {
     setLoading(true)
@@ -79,40 +87,41 @@ export default function StudentBrowsePage() {
     setReviews(data ?? [])
   }
 
+  // Step 1: Student clicks "Request to Borrow" → open date picker dialog
+  function openReturnDateDialog() {
+    if (!selectedBook || !myId) return
+    setProposedReturnDate(toInputDate(getMinReturnDate()))
+    setReturnDateError(null)
+    setReturnDateDialogOpen(true)
+  }
+
+  // Step 2: Student confirms their proposed return date → insert into book_requests
   async function handleRequestBorrow() {
+    const err = validateReturnDate(proposedReturnDate)
+    if (err) { setReturnDateError(err); return }
     if (!selectedBook || !myId) return
     setRequesting(true)
 
-    // BUG 2 FIX: Insert into book_requests (soft hold), NOT transactions
-    // book_id column must exist: ALTER TABLE book_requests ADD COLUMN IF NOT EXISTS book_id uuid REFERENCES books(id);
     const { error: reqError } = await supabase.from('book_requests').insert({
       user_id: myId,
       book_id: selectedBook.id,
       book_title: selectedBook.title,
       author: selectedBook.author ?? null,
       status: 'pending',
+      proposed_return_date: proposedReturnDate,
     })
 
     if (!reqError) {
-      // Notify all staff/admin of the new reservation
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('role', ['admin', 'staff'])
-
-      if (admins) {
-        await supabase.from('notifications').insert(
-          admins.map(a => ({
-            user_id: a.id,
-            title: 'New Book Reservation 📋',
-            message: `A student has requested to reserve "${selectedBook.title}". Approve in Borrow/Return.`,
-            type: 'info',
-            link: '/dashboard/staff/borrow-return',
-          }))
-        )
-      }
+      await notifyRoles(
+        ['admin', 'staff'],
+        'New Book Reservation 📋',
+        `A student requested "${selectedBook.title}" — proposed return: ${proposedReturnDate}.`,
+        'info',
+        '/dashboard/staff/borrow-return'
+      )
 
       toast.success('Reservation submitted! Staff will approve and notify you.')
+      setReturnDateDialogOpen(false)
       setIsModalOpen(false)
       loadData()
     } else {
@@ -360,16 +369,16 @@ export default function StudentBrowsePage() {
                 <div className="mt-6 pt-6 border-t border-slate-100">
                   {selectedBook.available_copies > 0 ? (
                     <Button
-                      className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold shadow-lg shadow-indigo-200"
-                      onClick={handleRequestBorrow}
-                      disabled={requesting}
+                      className="w-full h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold shadow-lg shadow-indigo-200 gap-2"
+                      onClick={openReturnDateDialog}
                     >
-                      {requesting ? 'Processing...' : 'Request to Borrow'}
+                      <CalendarCheck className="size-5" />
+                      Request to Borrow
                     </Button>
                   ) : (
                     <Button asChild variant="outline" className="w-full h-14 rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50 font-bold">
                       <Link href={`/dashboard/student/requests?title=${encodeURIComponent(selectedBook.title)}&author=${encodeURIComponent(selectedBook.author)}`}>
-                        Notify & Request a Copy
+                        Notify &amp; Request a Copy
                       </Link>
                     </Button>
                   )}
@@ -379,6 +388,56 @@ export default function StudentBrowsePage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Return Date Dialog (Phase 2) ── */}
+      <Dialog open={returnDateDialogOpen} onOpenChange={setReturnDateDialogOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="size-5 text-indigo-600" />
+              When will you return it?
+            </DialogTitle>
+            <DialogDescription>
+              Choose your planned return date for &ldquo;{selectedBook?.title}&rdquo;.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="return-date">Return Date</Label>
+              <input
+                id="return-date"
+                type="date"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                min={toInputDate(getMinReturnDate())}
+                max={toInputDate(getMaxReturnDate())}
+                value={proposedReturnDate}
+                onChange={e => {
+                  setProposedReturnDate(e.target.value)
+                  setReturnDateError(validateReturnDate(e.target.value))
+                }}
+              />
+              <p className="text-xs text-slate-500">Maximum 15 days. Weekends (Sat/Sun) not allowed.</p>
+              {returnDateError && (
+                <p className="text-xs text-red-600 font-medium">{returnDateError}</p>
+              )}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setReturnDateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+                onClick={handleRequestBorrow}
+                disabled={requesting || !!returnDateError || !proposedReturnDate}
+              >
+                {requesting ? 'Submitting...' : 'Submit Request'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+
+// Trigger rebuild

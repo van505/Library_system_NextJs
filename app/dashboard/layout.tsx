@@ -4,6 +4,7 @@ import { UserProvider } from '@/components/providers/user-provider'
 import AdminSidebar from '@/components/dashboard/admin-sidebar'
 import StaffSidebar from '@/components/dashboard/staff-sidebar'
 import StudentSidebar from '@/components/dashboard/student-sidebar'
+import ProfileDropdown from '@/components/dashboard/profile-dropdown'
 import { Bell, Search, ChevronRight } from 'lucide-react'
 import { NotificationsPanel } from '@/components/dashboard/notifications-panel'
 
@@ -29,13 +30,7 @@ async function TopBarRight({ profile }: { profile: any }) {
         />
       </div>
       <NotificationsPanel />
-      <div className="size-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 border border-indigo-200 shadow-sm hidden md:flex">
-        {profile?.avatar_url ? (
-           <img src={profile.avatar_url} alt="Avatar" className="size-full rounded-full object-cover" />
-        ) : (
-           <span className="text-xs font-bold text-indigo-700">{(profile?.full_name ?? 'U').charAt(0).toUpperCase()}</span>
-        )}
-      </div>
+      <ProfileDropdown profile={profile} />
     </div>
   )
 }

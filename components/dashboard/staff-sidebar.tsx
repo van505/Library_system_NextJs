@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, Library, ArrowLeftRight,
   Bot, LogOut, Menu, X, GraduationCap,
-  User
+  User, Archive
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
@@ -20,6 +20,7 @@ const staffNav: Record<string, NavItemConfig[]> = {
     { label: 'Books Catalog', href: '/dashboard/staff/books', icon: BookOpen },
     { label: 'Shelves', href: '/dashboard/staff/shelves', icon: Library },
     { label: 'Borrow / Return', href: '/dashboard/staff/borrow-return', icon: ArrowLeftRight },
+    { label: 'Archive', href: '/dashboard/staff/archive', icon: Archive },
   ],
   TOOLS: [
     { label: 'AI Chat', href: '/dashboard/chat', icon: Bot },

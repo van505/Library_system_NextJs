@@ -10,13 +10,21 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { createClient } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/store'
+import { notifyAdmins, notifyUser } from '@/lib/notifyAdmins'
 import { toast } from 'sonner'
-import { ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Search, Plus, Send, XCircle } from 'lucide-react'
+import {
+  ArrowLeftRight, Clock, CheckCircle, AlertTriangle, Search, Plus,
+  XCircle, CalendarCheck, Edit, Archive
+} from 'lucide-react'
 import { format, isPast, differenceInDays, addDays } from 'date-fns'
+import { toInputDate, getMinReturnDate, getMaxReturnDate, validateReturnDate } from '@/lib/dateUtils'
 
 export default function StaffTransactionsPage() {
   const supabase = createClient()
+  const { profile: staffProfile } = useAuthStore()
 
   // ── Transactions (actual borrow/return records) ─────────────────────────
   const [transactions, setTransactions] = React.useState<any[]>([])
@@ -34,36 +42,54 @@ export default function StaffTransactionsPage() {
   const [bookSearch, setBookSearch] = React.useState('')
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [selectedBook, setSelectedBook] = React.useState<any | null>(null)
-  const [dueDate, setDueDate] = React.useState(format(addDays(new Date(), 14), 'yyyy-MM-dd'))
+  const [dueDate, setDueDate] = React.useState(toInputDate(addDays(new Date(), 14)))
   const [notes, setNotes] = React.useState('')
   const [borrowing, setBorrowing] = React.useState(false)
   const [studentResults, setStudentResults] = React.useState<any[]>([])
   const [bookResults, setBookResults] = React.useState<any[]>([])
+
+  // ── Edit & Approve dialog ──────────────────────────────────────────────
+  const [editApproveOpen, setEditApproveOpen] = React.useState(false)
+  const [editTarget, setEditTarget] = React.useState<any | null>(null)
+  const [editDate, setEditDate] = React.useState('')
+  const [editDateError, setEditDateError] = React.useState<string | null>(null)
+  const [editNote, setEditNote] = React.useState('')
+  const [editApproving, setEditApproving] = React.useState(false)
+
+  // ── Decline dialog ─────────────────────────────────────────────────────
+  const [declineOpen, setDeclineOpen] = React.useState(false)
+  const [declineTarget, setDeclineTarget] = React.useState<any | null>(null)
+  const [declineReason, setDeclineReason] = React.useState('')
+  const [declining, setDeclining] = React.useState(false)
+
+  // ── Archive confirm dialog ─────────────────────────────────────────────
+  const [archiveTarget, setArchiveTarget] = React.useState<{ id: string; table: string; label: string } | null>(null)
 
   // ── Load Transactions ──────────────────────────────────────────────────
   async function loadTransactions() {
     setTxLoading(true)
     const { data } = await supabase.from('transactions')
       .select('*, books(title, author, shelves(name, location)), profiles!borrower_id(full_name, student_id, contact_number)')
-      .not('status', 'eq', 'pending') // pending records belong in book_requests now
+      .eq('is_archived', false)
+      .not('status', 'eq', 'pending')
       .order('borrowed_at', { ascending: false })
     setTransactions(data ?? [])
     setTxLoading(false)
   }
 
-  // ── Load Reservations (from book_requests, only those with book_id) ────
+  // ── Load Reservations (from book_requests with book_id) ────────────────
   async function loadReservations() {
     setResLoading(true)
     const { data: reqs } = await supabase
       .from('book_requests')
       .select('*, books(title, author, shelves(name))')
       .eq('status', 'pending')
+      .eq('is_archived', false)
       .not('book_id', 'is', null)
       .order('created_at', { ascending: false })
 
     if (!reqs || reqs.length === 0) { setReservations([]); setResLoading(false); return }
 
-    // Fetch profiles for all unique user_ids (bypass FK ambiguity)
     const userIds = [...new Set(reqs.map((r: any) => r.user_id).filter(Boolean))]
     const { data: profiles } = await supabase
       .from('profiles')
@@ -84,26 +110,27 @@ export default function StaffTransactionsPage() {
       .select('id, full_name, student_id, contact_number, role')
       .ilike('full_name', `%${studentSearch}%`)
       .limit(10)
-      .then(({ data }) => setStudentResults(data ?? []))
+      .then(res => setStudentResults(res.data ?? []))
   }, [studentSearch, supabase])
 
   React.useEffect(() => {
     if (!bookSearch.trim()) { setBookResults([]); return }
     supabase.from('books')
       .select('id, title, author, available_copies')
+      .eq('is_archived', false)
       .gt('available_copies', 0)
       .ilike('title', `%${bookSearch}%`)
       .limit(8)
-      .then(({ data }) => setBookResults(data ?? []))
+      .then(res => setBookResults(res.data ?? []))
   }, [bookSearch, supabase])
 
   function resetBorrow() {
     setSelectedStudent(null); setSelectedBook(null)
     setStudentSearch(''); setBookSearch('')
-    setDueDate(format(addDays(new Date(), 14), 'yyyy-MM-dd')); setNotes(''); setIsOpen(true)
+    setDueDate(toInputDate(addDays(new Date(), 14))); setNotes(''); setIsOpen(true)
   }
 
-  // ── Physical Walk-in Issue (direct borrowed) ──────────────────────────
+  // ── Physical Walk-in Issue ─────────────────────────────────────────────
   async function handleBorrowSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedStudent || !selectedBook) { toast.error('Please select both a student and a book.'); return }
@@ -118,17 +145,21 @@ export default function StaffTransactionsPage() {
     })
 
     if (!txError) {
-      // BUG 1 FIX: Safe GREATEST(available - 1, 0) to avoid negative values
       const { data: bk } = await supabase.from('books').select('available_copies, total_copies').eq('id', selectedBook.id).single()
       if (bk && bk.available_copies > 0) {
         await supabase.from('books').update({ available_copies: Math.max(bk.available_copies - 1, 0) }).eq('id', selectedBook.id)
       }
-      await supabase.from('notifications').insert({
-        user_id: selectedStudent.id,
-        title: 'Book Issued 📚',
-        message: `"${selectedBook.title}" has been issued to you. Due: ${format(new Date(dueDate), 'MMM d, yyyy')}.`,
-        type: 'info', link: '/dashboard/student/requests'
-      })
+      await notifyUser(
+        selectedStudent.id,
+        'Book Issued 📚',
+        `"${selectedBook.title}" has been issued to you. Due: ${format(new Date(dueDate), 'MMM d, yyyy')}.`,
+        'info', '/dashboard/student/requests'
+      )
+      await notifyAdmins(supabase,
+        `${staffProfile?.full_name ?? 'Staff'} issued a book`,
+        `Issued "${selectedBook.title}" to ${selectedStudent.full_name}.`,
+        '/dashboard/admin/borrow-return'
+      )
       toast.success('Book successfully issued!')
       setIsOpen(false)
       loadTransactions()
@@ -137,7 +168,7 @@ export default function StaffTransactionsPage() {
     setBorrowing(false)
   }
 
-  // ── BUG 1 FIX: Safe return — LEAST(available + 1, total_copies) ───────
+  // ── BUG 1 FIX: Safe return — LEAST(available + 1, total_copies) ────────
   async function handleMarkReturned(txId: string, bookId: string, studentId: string | null) {
     const { error: markErr } = await supabase.from('transactions')
       .update({ status: 'returned', returned_at: new Date().toISOString() })
@@ -152,74 +183,172 @@ export default function StaffTransactionsPage() {
           .eq('id', bookId)
       }
       if (studentId) {
-        await supabase.from('notifications').insert({
-          user_id: studentId, title: 'Book Returned ✅',
-          message: 'Thank you! The book has been marked as returned.',
-          type: 'success', link: '/dashboard/student/requests'
-        })
+        await notifyUser(
+          studentId, 'Book Returned ✅',
+          'Thank you! The book has been marked as returned.',
+          'success', '/dashboard/student/requests'
+        )
       }
       toast.success('Transaction marked as returned.')
       loadTransactions()
     } else toast.error(markErr.message)
   }
 
-  // ── BUG 4 FIX: Approve reservation → create transaction, safe decrement ─
-  async function handleApprove(reqId: string, bookId: string, userId: string | null, bookTitle: string, dueInDays = 14) {
-    const dueDateStr = format(addDays(new Date(), dueInDays), 'yyyy-MM-dd')
+  // ── Approve (as-is, use proposed_return_date) ─────────────────────────
+  async function handleApprove(r: any) {
+    const bk = r.books as any
+    const bookTitle = bk?.title ?? r.book_title
+    const dueDateStr = r.proposed_return_date ?? toInputDate(addDays(new Date(), 14))
 
-    // 1. Mark book_request as approved
-    const { error: reqErr } = await supabase.from('book_requests').update({ status: 'approved' }).eq('id', reqId)
+    const { error: reqErr } = await supabase.from('book_requests').update({ status: 'approved', approved_return_date: dueDateStr }).eq('id', r.id)
     if (reqErr) { toast.error(reqErr.message); return }
 
-    // 2. Create actual borrow transaction
     const { error: txErr } = await supabase.from('transactions').insert({
-      book_id: bookId,
-      borrower_id: userId,
+      book_id: r.book_id,
+      borrower_id: r.user_id,
       status: 'borrowed',
       borrowed_at: new Date().toISOString(),
       due_date: dueDateStr,
     })
     if (txErr) { toast.error(txErr.message); return }
 
-    // 3. Safe inventory decrement: GREATEST(available - 1, 0)
-    const { data: bk } = await supabase.from('books').select('available_copies, total_copies').eq('id', bookId).single()
-    if (bk && bk.available_copies > 0) {
+    const { data: bkData } = await supabase.from('books').select('available_copies, total_copies').eq('id', r.book_id).single()
+    if (bkData && bkData.available_copies > 0) {
       await supabase.from('books')
-        .update({ available_copies: Math.max(bk.available_copies - 1, 0) })
-        .eq('id', bookId)
+        .update({ available_copies: Math.max(bkData.available_copies - 1, 0) })
+        .eq('id', r.book_id)
     }
 
-    // 4. Notify student
-    if (userId) {
-      await supabase.from('notifications').insert({
-        user_id: userId, title: 'Reservation Approved ✅',
-        message: `Your request for "${bookTitle}" has been approved! Due: ${dueDateStr}. Please collect from the library.`,
-        type: 'success', link: '/dashboard/student/requests'
-      })
+    if (r.user_id) {
+      await notifyUser(
+        r.user_id, 'Reservation Approved ✅',
+        `Your request for "${bookTitle}" has been approved! Due: ${format(new Date(dueDateStr + 'T00:00:00'), 'MMM d, yyyy')}. Please collect from the library.`,
+        'success', '/dashboard/student/requests'
+      )
     }
+
+    const studentName = r.profile?.full_name ?? 'a student'
+    await notifyAdmins(supabase,
+      `${staffProfile?.full_name ?? 'Staff'} approved a reservation`,
+      `Approved ${studentName}'s request for "${bookTitle}".`,
+      '/dashboard/admin/borrow-return'
+    )
 
     toast.success('Reservation approved — book issued!')
-    loadReservations()
-    loadTransactions()
+    loadReservations(); loadTransactions()
   }
 
-  // ── Cancel reservation (staff side) ──────────────────────────────────
-  async function handleCancelReservation(reqId: string, userId: string | null, bookTitle: string) {
-    const { error } = await supabase.from('book_requests').update({ status: 'cancelled' }).eq('id', reqId)
+  // ── Edit & Approve ─────────────────────────────────────────────────────
+  function openEditApprove(r: any) {
+    setEditTarget(r)
+    setEditDate(r.proposed_return_date ?? toInputDate(getMinReturnDate()))
+    setEditDateError(null)
+    setEditNote('')
+    setEditApproveOpen(true)
+  }
+
+  async function handleEditApprove() {
+    const err = validateReturnDate(editDate)
+    if (err) { setEditDateError(err); return }
+    if (!editTarget) return
+    setEditApproving(true)
+
+    const bk = editTarget.books as any
+    const bookTitle = bk?.title ?? editTarget.book_title
+
+    const { error: reqErr } = await supabase.from('book_requests').update({
+      status: 'approved',
+      approved_return_date: editDate,
+      return_date_edited: true,
+      staff_note: editNote || null,
+    }).eq('id', editTarget.id)
+    if (reqErr) { toast.error(reqErr.message); setEditApproving(false); return }
+
+    const { error: txErr } = await supabase.from('transactions').insert({
+      book_id: editTarget.book_id,
+      borrower_id: editTarget.user_id,
+      status: 'borrowed',
+      borrowed_at: new Date().toISOString(),
+      due_date: editDate,
+    })
+    if (txErr) { toast.error(txErr.message); setEditApproving(false); return }
+
+    const { data: bkData } = await supabase.from('books').select('available_copies, total_copies').eq('id', editTarget.book_id).single()
+    if (bkData && bkData.available_copies > 0) {
+      await supabase.from('books')
+        .update({ available_copies: Math.max(bkData.available_copies - 1, 0) })
+        .eq('id', editTarget.book_id)
+    }
+
+    if (editTarget.user_id) {
+      await notifyUser(
+        editTarget.user_id, 'Reservation Approved ✅',
+        `Your request for "${bookTitle}" was approved. Note: Return date adjusted to ${format(new Date(editDate + 'T00:00:00'), 'MMM d, yyyy')}.${editNote ? ` Staff note: ${editNote}` : ''}`,
+        'success', '/dashboard/student/requests'
+      )
+    }
+
+    const studentName = editTarget.profile?.full_name ?? 'a student'
+    await notifyAdmins(supabase,
+      `${staffProfile?.full_name ?? 'Staff'} approved a reservation (date adjusted)`,
+      `Approved ${studentName}'s request for "${bookTitle}" with adjusted return date.`,
+      '/dashboard/admin/borrow-return'
+    )
+
+    toast.success('Reservation approved with adjusted date!')
+    setEditApproveOpen(false)
+    loadReservations(); loadTransactions()
+    setEditApproving(false)
+  }
+
+  // ── Decline ────────────────────────────────────────────────────────────
+  function openDecline(r: any) {
+    setDeclineTarget(r)
+    setDeclineReason('')
+    setDeclineOpen(true)
+  }
+
+  async function handleDecline() {
+    if (!declineTarget) return
+    setDeclining(true)
+
+    const bk = declineTarget.books as any
+    const bookTitle = bk?.title ?? declineTarget.book_title
+
+    const { error } = await supabase.from('book_requests').update({ status: 'rejected' }).eq('id', declineTarget.id)
     if (!error) {
-      if (userId) {
-        await supabase.from('notifications').insert({
-          user_id: userId, title: 'Reservation Cancelled',
-          message: `Your reservation for "${bookTitle}" has been cancelled by staff.`,
-          type: 'info', link: '/dashboard/student/requests'
-        })
+      if (declineTarget.user_id) {
+        await notifyUser(
+          declineTarget.user_id, 'Reservation Declined ❌',
+          `Your request for "${bookTitle}" could not be approved at this time.${declineReason ? ` Reason: ${declineReason}` : ''}`,
+          'danger', '/dashboard/student/requests'
+        )
       }
-      toast.success('Reservation cancelled.')
+
+      const studentName = declineTarget.profile?.full_name ?? 'a student'
+      await notifyAdmins(supabase,
+        `${staffProfile?.full_name ?? 'Staff'} declined a reservation`,
+        `Declined ${studentName}'s request for "${bookTitle}".${declineReason ? ` Reason: ${declineReason}` : ''}`,
+        '/dashboard/admin/borrow-return'
+      )
+
+      toast.success('Reservation declined.')
+      setDeclineOpen(false)
       loadReservations()
     } else toast.error(error.message)
+    setDeclining(false)
   }
 
-  // ── Filtering (transactions only — reservations are separate) ─────────
+  // ── Archive ────────────────────────────────────────────────────────────
+  async function handleArchive() {
+    if (!archiveTarget) return
+    await supabase.from(archiveTarget.table as any).update({ is_archived: true }).eq('id', archiveTarget.id)
+    toast.success(`"${archiveTarget.label}" archived.`)
+    setArchiveTarget(null)
+    loadTransactions(); loadReservations()
+  }
+
+  // ── Filtering ──────────────────────────────────────────────────────────
   const filtered = transactions.filter(t => {
     if (tab === 'all') return true
     if (tab === 'borrowed') return t.status === 'borrowed' && !isPast(new Date(t.due_date ?? '9999-12-31'))
@@ -227,8 +356,6 @@ export default function StaffTransactionsPage() {
     if (tab === 'overdue') return t.status === 'borrowed' && t.due_date && isPast(new Date(t.due_date))
     return false
   })
-
-  const loading = txLoading && resLoading
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -245,7 +372,7 @@ export default function StaffTransactionsPage() {
           </DialogTrigger>
           <DialogContent className="rounded-2xl sm:max-w-[500px]">
             <DialogHeader><DialogTitle>Issue Book to Student</DialogTitle></DialogHeader>
-            <DialogDescription className="sr-only">Dialog</DialogDescription>
+            <DialogDescription className="sr-only">Issue book dialog</DialogDescription>
             <form onSubmit={handleBorrowSubmit} className="space-y-4 mt-2">
               <div className="space-y-2">
                 <Label>Student Search</Label>
@@ -307,7 +434,10 @@ export default function StaffTransactionsPage() {
 
               <div className="space-y-2">
                 <Label>Due Date</Label>
-                <Input type="date" required value={dueDate} onChange={e => setDueDate(e.target.value)} className="rounded-xl" />
+                <input type="date" required
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())}
+                  value={dueDate} onChange={e => setDueDate(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Notes (Optional)</Label>
@@ -346,15 +476,16 @@ export default function StaffTransactionsPage() {
               <tr>
                 <th className="p-4 font-semibold">Student</th>
                 <th className="p-4 font-semibold">Book Requested</th>
+                <th className="p-4 font-semibold">Proposed Return</th>
                 <th className="p-4 font-semibold">Requested</th>
                 <th className="p-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {resLoading ? (
-                <tr><td colSpan={4} className="p-8 text-center"><Skeleton className="h-4 w-32 mx-auto" /></td></tr>
+                <tr><td colSpan={5} className="p-8 text-center"><Skeleton className="h-4 w-32 mx-auto" /></td></tr>
               ) : reservations.length === 0 ? (
-                <tr><td colSpan={4} className="p-12 text-center text-slate-500">
+                <tr><td colSpan={5} className="p-12 text-center text-slate-500">
                   <Clock className="size-10 text-slate-300 mx-auto mb-3" /> No pending reservations.
                 </td></tr>
               ) : reservations.map(r => {
@@ -372,20 +503,31 @@ export default function StaffTransactionsPage() {
                       <p className="text-xs text-slate-500">{bk?.author ?? r.author}</p>
                       {bk?.shelves && <p className="text-xs text-slate-400 mt-1">📍 {bk.shelves.name}</p>}
                     </td>
+                    <td className="p-4 align-top text-sm">
+                      {r.proposed_return_date ? (
+                        <span className="font-medium text-indigo-700">
+                          {format(new Date(r.proposed_return_date + 'T00:00:00'), 'MMM d, yyyy')}
+                        </span>
+                      ) : <span className="text-slate-400 text-xs italic">Not specified</span>}
+                    </td>
                     <td className="p-4 align-top text-xs text-slate-500 space-y-0.5">
-                      <p>{format(new Date(r.created_at), 'MMM d, yyyy h:mm a')}</p>
+                      <p>{format(new Date(r.created_at), 'MMM d, h:mm a')}</p>
                       <p className={hoursOld > 24 ? 'text-red-500 font-semibold' : 'text-slate-400'}>
-                        {hoursOld > 24 ? `⚠ ${Math.floor(hoursOld)}h ago — expiring` : `${Math.round(hoursOld)}h ago`}
+                        {hoursOld > 24 ? `⚠ ${Math.floor(hoursOld)}h ago` : `${Math.round(hoursOld)}h ago`}
                       </p>
                     </td>
                     <td className="p-4 text-right align-top space-y-1.5">
-                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white w-full"
-                        onClick={() => handleApprove(r.id, r.book_id, r.user_id, bk?.title ?? r.book_title)}>
-                        <Send className="size-3 mr-1" /> Approve &amp; Issue
+                      <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white w-full gap-1"
+                        onClick={() => handleApprove(r)}>
+                        <CheckCircle className="size-3" /> Approve
                       </Button>
-                      <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 w-full"
-                        onClick={() => handleCancelReservation(r.id, r.user_id, bk?.title ?? r.book_title)}>
-                        <XCircle className="size-3 mr-1" /> Cancel
+                      <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50 w-full gap-1"
+                        onClick={() => openEditApprove(r)}>
+                        <Edit className="size-3" /> Edit &amp; Approve
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 w-full gap-1"
+                        onClick={() => openDecline(r)}>
+                        <XCircle className="size-3" /> Decline
                       </Button>
                     </td>
                   </tr>
@@ -395,7 +537,7 @@ export default function StaffTransactionsPage() {
           </table>
         </div>
       ) : (
-        /* ── Transactions Table (actual borrow/return records) ── */
+        /* ── Transactions Table ── */
         <div className="bg-white border text-sm border-slate-200 rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
@@ -454,14 +596,21 @@ export default function StaffTransactionsPage() {
                       {statusEl}
                       {t.status === 'borrowed' && <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Due: {t.due_date}</p>}
                     </td>
-                    <td className="p-4 text-right align-top">
-                      {t.status === 'borrowed' ? (
-                        <Button size="sm" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:text-indigo-700 hover:bg-indigo-50"
+                    <td className="p-4 text-right align-top space-y-1.5">
+                      {t.status === 'borrowed' && (
+                        <Button size="sm" variant="outline" className="bg-white border-slate-200 text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 w-full"
                           onClick={() => handleMarkReturned(t.id, t.book_id, t.borrower_id)}>
                           Mark Returned
                         </Button>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">No action needed</span>
+                      )}
+                      {t.status === 'returned' && (
+                        <Button size="sm" variant="ghost" className="text-slate-400 hover:text-amber-600 hover:bg-amber-50 w-full gap-1"
+                          onClick={() => setArchiveTarget({ id: t.id, table: 'transactions', label: book?.title ?? 'record' })}>
+                          <Archive className="size-3" /> Archive
+                        </Button>
+                      )}
+                      {t.status !== 'borrowed' && t.status !== 'returned' && (
+                        <span className="text-xs text-slate-400 italic">—</span>
                       )}
                     </td>
                   </tr>
@@ -471,6 +620,94 @@ export default function StaffTransactionsPage() {
           </table>
         </div>
       )}
+
+      {/* ── Edit & Approve Dialog ── */}
+      <Dialog open={editApproveOpen} onOpenChange={setEditApproveOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarCheck className="size-5 text-amber-600" /> Edit &amp; Approve
+            </DialogTitle>
+            <DialogDescription>Adjust the return date for this reservation.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            {editTarget?.proposed_return_date && (
+              <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl text-sm text-slate-600">
+                Student proposed: <strong className="text-indigo-700">
+                  {format(new Date(editTarget.proposed_return_date + 'T00:00:00'), 'MMM d, yyyy')}
+                </strong>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>New Return Date</Label>
+              <input type="date"
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())}
+                value={editDate}
+                onChange={e => { setEditDate(e.target.value); setEditDateError(validateReturnDate(e.target.value)) }} />
+              <p className="text-xs text-slate-500">Max 15 days. Weekends not allowed.</p>
+              {editDateError && <p className="text-xs text-red-600 font-medium">{editDateError}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Note to Student (Optional)</Label>
+              <Textarea className="rounded-xl resize-none" rows={2} placeholder="e.g. Due to high demand, adjusted to a shorter period."
+                value={editNote} onChange={e => setEditNote(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setEditApproveOpen(false)}>Cancel</Button>
+              <Button className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={handleEditApprove}
+                disabled={editApproving || !!editDateError || !editDate}>
+                {editApproving ? 'Approving...' : 'Confirm'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Decline Dialog ── */}
+      <Dialog open={declineOpen} onOpenChange={setDeclineOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="size-5" /> Decline Reservation
+            </DialogTitle>
+            <DialogDescription>
+              Declining &ldquo;{(declineTarget?.books as any)?.title ?? declineTarget?.book_title}&rdquo; for {declineTarget?.profile?.full_name ?? 'student'}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-2">
+              <Label>Reason (Optional)</Label>
+              <Textarea className="rounded-xl resize-none" rows={3} placeholder="e.g. Book already reserved by another student..."
+                value={declineReason} onChange={e => setDeclineReason(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setDeclineOpen(false)}>Cancel</Button>
+              <Button className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleDecline} disabled={declining}>
+                {declining ? 'Declining...' : 'Decline Request'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Archive Confirm Dialog ── */}
+      <AlertDialog open={!!archiveTarget} onOpenChange={open => !open && setArchiveTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{archiveTarget?.label}&rdquo; will be moved to the archive. It can be restored later from the Archive page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive} className="bg-amber-600 hover:bg-amber-700">Archive</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

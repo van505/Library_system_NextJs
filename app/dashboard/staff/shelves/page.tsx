@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase'
+import { useAuthStore } from '@/lib/store'
+import { notifyAdmins } from '@/lib/notifyAdmins'
 import { toast } from 'sonner'
 import { Library, MapPin, Plus, Edit, Trash2, Search, BookOpen, LayoutGrid, AlertTriangle } from 'lucide-react'
 import type { Shelf } from '@/lib/supabase'
@@ -34,6 +36,7 @@ function getCapacityStatus(pct: number): 'empty' | 'partial' | 'full' {
 
 export default function StaffShelvesPage() {
   const supabase = createClient()
+  const { profile: staffProfile } = useAuthStore()
   const [shelves, setShelves] = React.useState<ShelfWithCount[]>([])
   const [loading, setLoading] = React.useState(true)
 
@@ -158,6 +161,12 @@ export default function StaffShelvesPage() {
     if (error) toast.error(error.message)
     else {
       toast.success(isEditing ? 'Shelf updated' : 'Shelf created')
+      await notifyAdmins(
+        supabase,
+        isEditing ? `${staffProfile?.full_name ?? 'Staff'} edited a shelf` : `${staffProfile?.full_name ?? 'Staff'} added a shelf`,
+        isEditing ? `Updated shelf "${name}" (${location}).` : `Added new shelf "${name}" at ${location}.`,
+        '/dashboard/admin/shelves'
+      )
       setIsOpen(false)
       loadData()
     }
@@ -168,10 +177,15 @@ export default function StaffShelvesPage() {
       toast.error('Cannot delete a shelf with books assigned. Reassign or delete the books first.')
       return
     }
+    const target = shelves.find(s => s.id === id)
     if (!confirm('Delete this shelf? This cannot be undone.')) return
     const { error } = await supabase.from('shelves').delete().eq('id', id)
     if (error) toast.error(error.message)
-    else { toast.success('Shelf deleted'); loadData() }
+    else {
+      toast.success('Shelf deleted')
+      await notifyAdmins(supabase, `${staffProfile?.full_name ?? 'Staff'} deleted a shelf`, `Deleted shelf "${target?.name ?? 'a shelf'}".`, '/dashboard/admin/shelves')
+      loadData()
+    }
   }
 
   return (
