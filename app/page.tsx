@@ -3,18 +3,37 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import { BookOpen, Bot, Search, ArrowRight, GraduationCap, Info, AlertTriangle, CheckCircle2, ChevronRight, MessageSquare, MapPin, BookMarked } from 'lucide-react'
+import { BookOpen, Bot, Search, ArrowRight, GraduationCap, Info, AlertTriangle, CheckCircle2, ChevronRight, MessageSquare, MapPin, BookMarked, Sparkles, Book, Compass, Library, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import type { Book, Profile } from '@/lib/supabase'
+import type { Book as SupabaseBook, Profile } from '@/lib/supabase'
 import { getStudentCount } from '@/app/actions/stats'
 
-type BookWithShelf = Book & { shelves?: { name: string; location: string } | null }
+type BookWithShelf = SupabaseBook & { 
+  shelves?: { name: string; location: string } | null,
+  book_categories?: { categories?: { name: string } }[] | null
+}
 type Announcement = { id: string; title: string; content: string; type: string; created_at: string }
+
+// Map categories to icons/colors for premium UI
+const CATEGORY_MAP: Record<string, { icon: string, color: string }> = {
+  'All': { icon: '🌐', color: 'bg-slate-900 text-white border-slate-900' },
+  'Programming': { icon: '💻', color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
+  'Computer Science': { icon: '⚙️', color: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' },
+  'Fiction': { icon: '🎭', color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
+  'Science': { icon: '🔬', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+  'History': { icon: '⌛', color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
+  'Mathematics': { icon: '📏', color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
+  'Literature': { icon: '📖', color: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100' },
+}
+
+const getCategoryStyle = (cat: string) => {
+  return CATEGORY_MAP[cat] || { icon: '📚', color: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100' }
+}
 
 export default function HomePage() {
   const supabase = createClient()
@@ -24,13 +43,14 @@ export default function HomePage() {
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([])
   const [loading, setLoading] = React.useState(true)
   const [search, setSearch] = React.useState('')
-  const [genreFilter, setGenreFilter] = React.useState('All')
+  const [categoryFilter, setCategoryFilter] = React.useState('All')
   const [borrowingId, setBorrowingId] = React.useState<string | null>(null)
+  const [uniqueCategories, setUniqueCategories] = React.useState<string[]>([])
 
   React.useEffect(() => {
     async function load() {
       const [bRes, sRes, studentCount, aRes, authRes] = await Promise.all([
-        supabase.from('books').select('*, shelves(name, location)').order('created_at', { ascending: false }),
+        supabase.from('books').select('*, shelves(name, location), book_categories(categories(name))').order('created_at', { ascending: false }),
         supabase.from('shelves').select('id', { count: 'exact' }),
         getStudentCount(),
         supabase.from('announcements').select('*').eq('is_active', true).eq('show_on_landing', true).order('created_at', { ascending: false }),
@@ -47,6 +67,15 @@ export default function HomePage() {
       })
       setAnnouncements(aRes.data ?? [])
 
+      // Extract unique categories
+      const cats = new Set<string>()
+      allBooks.forEach(b => {
+        b.book_categories?.forEach(bc => {
+          if (bc.categories?.name) cats.add(bc.categories.name)
+        })
+      })
+      setUniqueCategories(['All', ...Array.from(cats)].slice(0, 8))
+
       if (authRes.data.user) {
         const { data } = await supabase.from('profiles').select('*').eq('id', authRes.data.user.id).single()
         useAuthStore.getState().setProfile(data as Profile)
@@ -56,13 +85,16 @@ export default function HomePage() {
     load()
   }, [supabase])
 
-  const genres = ['All', ...Array.from(new Set(books.map(b => b.genre).filter(Boolean)))].slice(0, 8) as string[]
-
   const filteredBooks = books.filter(b => {
     const q = search.toLowerCase()
     const matchSearch = !q || b.title.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q)
-    const matchGenre = genreFilter === 'All' || b.genre === genreFilter
-    return matchSearch && matchGenre
+    
+    let matchCat = categoryFilter === 'All'
+    if (!matchCat && b.book_categories) {
+      matchCat = b.book_categories.some(bc => bc.categories?.name === categoryFilter)
+    }
+    
+    return matchSearch && matchCat
   }).slice(0, 12)
 
   async function handleBorrowRequest(book: BookWithShelf) {
@@ -76,7 +108,7 @@ export default function HomePage() {
 
     const { error } = await supabase.from('transactions').insert([{
       book_id: book.id,
-      borrower_id: profile.id, // we still use borrower_id as it was standard
+      borrower_id: profile.id,
       status: 'pending',
       borrowed_at: new Date().toISOString(),
       due_date: dueDate.toISOString(),
@@ -88,221 +120,263 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
-      {/* â”€â”€ Section 1: Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section className="relative pt-24 pb-32 px-4 flex flex-col items-center justify-center text-white overflow-hidden min-h-[90vh]">
-        <div className="absolute inset-0 z-0 bg-gradient-to-br from-indigo-900 via-violet-900 to-slate-900" />
-        <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(to right, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+    <div className="flex flex-col min-h-screen bg-[#f8fafc] font-sans selection:bg-indigo-500/30">
+      {/* ── Section 1: Hero ──────────────────────────────────────────────────────── */}
+      <section className="relative pt-24 pb-32 px-4 flex flex-col items-center justify-center text-slate-900 overflow-hidden min-h-[90vh]">
+        {/* Animated Background Gradients */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-br from-indigo-400/20 via-purple-400/20 to-fuchsia-400/20 blur-[100px] rounded-[100%] pointer-events-none -z-10" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-400/10 blur-[120px] rounded-[100%] pointer-events-none -z-10" />
+        
+        {/* Subtle Grid Pattern */}
+        <div className="absolute inset-0 z-[-5] opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(to right, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
 
-        <div className="relative z-10 flex flex-col items-center gap-6 max-w-3xl text-center">
-          <div className="size-24 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-2xl">
-            <BookOpen className="size-12 text-white" />
-          </div>
+        <div className="relative z-10 flex flex-col items-center gap-6 max-w-4xl text-center mt-12">
+          <Badge className="bg-white/80 backdrop-blur-md text-indigo-700 hover:bg-white border-indigo-100/50 shadow-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-widest flex gap-2 items-center">
+            <Sparkles className="size-3.5 text-indigo-500" /> Next-Gen Library Experience
+          </Badge>
 
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-center gap-2">
-              <GraduationCap className="size-5 text-indigo-300" />
-              <span className="text-sm font-semibold tracking-widest uppercase text-indigo-300">
-                SchoolLib System
-              </span>
+          <h1 className="text-5xl sm:text-7xl font-black tracking-tight leading-[1.1]">
+            Your school library, <br className="hidden sm:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-300% animate-gradient">
+              supercharged with AI
+            </span>
+          </h1>
+          
+          <p className="text-lg text-slate-500 max-w-2xl mt-2 leading-relaxed">
+            Discover your next favorite book instantly. Search the catalog, find exact shelf locations, and chat with our AI Librarian to get personalized recommendations.
+          </p>
+
+          {/* Premium Glassmorphic Search Bar */}
+          <div className="relative w-full max-w-2xl mt-6 group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+            <div className="relative flex items-center bg-white/80 backdrop-blur-xl border border-white rounded-2xl shadow-xl overflow-hidden p-2">
+              <Search className="size-5 text-indigo-400 ml-4 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search by title, author, or keyword..."
+                className="w-full h-12 px-4 bg-transparent text-slate-800 placeholder-slate-400 focus:outline-none text-base"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-6 h-10 shadow-md">
+                Search
+              </Button>
             </div>
-            <h1 className="text-5xl sm:text-7xl font-bold tracking-tight">
-              Your school library, <br className="hidden sm:block" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">
-                supercharged with AI
-              </span>
-            </h1>
-          </div>
-
-          <div className="relative w-full max-w-xl mt-4">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by title, author, or keyword..."
-              className="w-full h-14 pl-12 pr-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 backdrop-blur-sm"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
           </div>
 
           {!profile ? (
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-              <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-8 h-12 text-base shadow-lg shadow-indigo-600/20" asChild>
-                <Link href="/login">Sign In</Link>
+            <div className="flex gap-4 mt-8">
+              <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-8 h-12 shadow-lg shadow-indigo-600/20" asChild>
+                <Link href="/login">Sign In <ArrowRight className="ml-2 size-4" /></Link>
               </Button>
-              <Button size="lg" variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 rounded-xl px-8 h-12 text-base" asChild>
-                <Link href="/register">Register as Student</Link>
+              <Button size="lg" variant="outline" className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200 rounded-full px-8 h-12 shadow-sm" asChild>
+                <Link href="/register">Student Registration</Link>
               </Button>
             </div>
           ) : (
-            <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-8 h-12 mt-4" asChild>
-              <Link href="/dashboard">Go to Dashboard <ArrowRight className="ml-2 size-4" /></Link>
+            <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-8 h-12 mt-8 shadow-lg shadow-indigo-600/20" asChild>
+              <Link href="/dashboard">Access Dashboard <ArrowRight className="ml-2 size-4" /></Link>
             </Button>
           )}
 
-          {/* Live Stats */}
-          <div className="mt-12 flex flex-wrap justify-center gap-8 text-sm font-medium text-indigo-200 bg-black/20 backdrop-blur-md rounded-2xl px-8 py-4 border border-white/10">
-            {loading ? (
-              <Skeleton className="h-5 w-64 bg-white/10" />
-            ) : (
-              <>
-                <div className="flex items-center gap-2"><BookOpen className="size-4" /> <span className="text-white text-lg font-bold">{stats.books}</span> Books</div>
-                <div className="flex items-center gap-2"><CheckCircle2 className="size-4 text-emerald-400" /> <span className="text-white text-lg font-bold">{stats.available}</span> Available Now</div>
-                <div className="flex items-center gap-2"><BookMarked className="size-4" /> <span className="text-white text-lg font-bold">{stats.shelves}</span> Shelves</div>
-                <div className="flex items-center gap-2"><GraduationCap className="size-4" /> <span className="text-white text-lg font-bold">{stats.students}</span> Students</div>
-              </>
-            )}
+          {/* Premium Live Stats */}
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl">
+            {[
+              { icon: Book, value: stats.books, label: 'Total Books', color: 'text-blue-500', bg: 'bg-blue-50' },
+              { icon: CheckCircle2, value: stats.available, label: 'Available Now', color: 'text-emerald-500', bg: 'bg-emerald-50' },
+              { icon: Library, value: stats.shelves, label: 'Shelves', color: 'text-purple-500', bg: 'bg-purple-50' },
+              { icon: GraduationCap, value: stats.students, label: 'Students', color: 'text-amber-500', bg: 'bg-amber-50' },
+            ].map((stat, i) => (
+              <div key={i} className="bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-white shadow-sm flex flex-col items-center justify-center text-center">
+                <div className={`size-10 rounded-full flex items-center justify-center mb-2 ${stat.bg}`}>
+                  <stat.icon className={`size-5 ${stat.color}`} />
+                </div>
+                {loading ? <Skeleton className="h-6 w-12 mb-1" /> : <span className="text-2xl font-black text-slate-800">{stat.value}</span>}
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{stat.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* â”€â”€ Section 3: Announcements (Moved up if active) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Section 3: Announcements ─────────────────────────────────────────── */}
       {announcements.length > 0 && (
-        <section className="bg-white border-b border-slate-200 py-6 px-4">
-          <div className="max-w-6xl mx-auto flex flex-col gap-3">
-            {announcements.map(ann => (
-              <div key={ann.id} className={`flex items-start gap-4 p-4 rounded-xl border ${ann.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' :
-                ann.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
-                  'bg-blue-50 border-blue-200 text-blue-900'
-                }`}>
-                {ann.type === 'warning' ? <AlertTriangle className="size-5 shrink-0 mt-0.5 text-amber-600" /> :
-                  ann.type === 'success' ? <CheckCircle2 className="size-5 shrink-0 mt-0.5 text-emerald-600" /> :
-                    <Info className="size-5 shrink-0 mt-0.5 text-blue-600" />}
-                <div>
-                  <h4 className="font-semibold text-sm">{ann.title}</h4>
-                  <p className="text-sm mt-1 opacity-90">{ann.content}</p>
+        <section className="bg-white border-y border-slate-200 py-8 px-4 relative z-20 shadow-sm">
+          <div className="max-w-6xl mx-auto flex flex-col gap-4">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Zap className="size-4 text-amber-500" /> Latest Announcements</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {announcements.slice(0,2).map(ann => (
+                <div key={ann.id} className={`flex items-start gap-4 p-5 rounded-2xl border transition-all hover:shadow-md ${ann.type === 'warning' ? 'bg-amber-50/50 border-amber-200' :
+                  ann.type === 'success' ? 'bg-emerald-50/50 border-emerald-200' :
+                    'bg-blue-50/50 border-blue-200'
+                  }`}>
+                  {ann.type === 'warning' ? <AlertTriangle className="size-6 shrink-0 text-amber-500" /> :
+                    ann.type === 'success' ? <CheckCircle2 className="size-6 shrink-0 text-emerald-500" /> :
+                      <Info className="size-6 shrink-0 text-blue-500" />}
+                  <div>
+                    <h4 className="font-bold text-slate-900">{ann.title}</h4>
+                    <p className="text-sm mt-1 text-slate-600 leading-relaxed">{ann.content}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </section>
       )}
 
-      {/* â”€â”€ Section 2: Featured Books â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section className="py-20 px-4 max-w-7xl mx-auto w-full">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Browse Our Collection</h2>
-          <Button variant="ghost" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50" asChild>
-            <Link href="/dashboard/student/browse">View All Directory <ChevronRight className="ml-1 size-4" /></Link>
+      {/* ── Section 2: Featured Books ────────────────────────────────────────── */}
+      <section className="py-24 px-4 max-w-7xl mx-auto w-full relative z-20">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+          <div>
+            <h2 className="text-4xl font-black text-slate-900 tracking-tight">Browse Collection</h2>
+            <p className="text-slate-500 mt-2">Discover popular titles and new arrivals.</p>
+          </div>
+          <Button variant="ghost" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-full font-semibold" asChild>
+            <Link href="/dashboard/student/browse">View Full Directory <ArrowRight className="ml-2 size-4" /></Link>
           </Button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
-          {genres.map(g => (
-            <button key={g} onClick={() => setGenreFilter(g)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${genreFilter === g
-                ? 'bg-slate-900 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+        {/* Dynamic Premium Category Filters */}
+        <div className="flex gap-3 overflow-x-auto pb-6 mb-4 scrollbar-hide snap-x">
+          {uniqueCategories.map(cat => {
+            const style = getCategoryStyle(cat)
+            const isActive = categoryFilter === cat
+            return (
+              <button key={cat} onClick={() => setCategoryFilter(cat)}
+                className={`snap-start flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all border shadow-sm ${
+                  isActive 
+                  ? 'bg-slate-900 text-white border-slate-900 scale-105 shadow-md' 
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow'
                 }`}>
-              {g}
-            </button>
-          ))}
+                <span className="text-base">{style.icon}</span> {cat}
+              </button>
+            )
+          })}
         </div>
 
-        {/* Book Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Premium Book Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           {loading ? (
-            Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
+            Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-80 rounded-3xl" />)
           ) : filteredBooks.length === 0 ? (
-            <div className="col-span-full py-20 text-center">
-              <BookOpen className="size-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">No books found matching your criteria.</p>
+            <div className="col-span-full py-32 text-center bg-white rounded-3xl border border-slate-200 border-dashed">
+              <Compass className="size-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-slate-700">No books found</h3>
+              <p className="text-slate-500 mt-1">Try adjusting your filters or search query.</p>
             </div>
           ) : (
-            filteredBooks.map(b => (
-              <Card key={b.id} className="overflow-hidden bg-white rounded-2xl border border-slate-200 flex flex-col">
-                <div className="h-32 flex items-center justify-center shrink-0 border-b border-slate-100"
-                  style={{
-                    background: b.cover_url
-                      ? `url(${b.cover_url}) center/cover`
-                      : `linear-gradient(135deg, #${Math.floor(Math.random() * 16777215).toString(16)}20, #${Math.floor(Math.random() * 16777215).toString(16)}40)`
-                  }}>
-                  {!b.cover_url && <span className="text-4xl font-bold text-slate-800/20">{b.title.charAt(0)}</span>}
-                </div>
-                <CardContent className="p-5 flex-1 flex flex-col gap-2">
-                  <div>
-                    <h3 className="font-semibold text-slate-900 line-clamp-1">{b.title}</h3>
-                    <p className="text-xs text-slate-500 mt-1">{b.author}</p>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    {b.genre && <Badge variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200">{b.genre}</Badge>}
-                    <Badge variant="outline" className={`border-transparent ${b.available_copies > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+            filteredBooks.map(b => {
+              const mainCat = b.book_categories?.[0]?.categories?.name || 'General'
+              const catStyle = getCategoryStyle(mainCat)
+              
+              return (
+              <Card key={b.id} className="overflow-hidden bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group cursor-pointer">
+                <div className="relative h-48 overflow-hidden bg-slate-100 flex items-center justify-center p-4">
+                  {/* Decorative backdrop */}
+                  <div className="absolute inset-0 opacity-20 blur-2xl transition-opacity group-hover:opacity-40" 
+                       style={{ background: b.cover_url ? `url(${b.cover_url})` : catStyle.color.split(' ')[0] }}></div>
+                  
+                  {b.cover_url ? (
+                    <img src={b.cover_url} alt={b.title} className="h-full w-auto object-cover rounded-md shadow-lg relative z-10 group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className={`size-full rounded-xl flex items-center justify-center relative z-10 shadow-inner ${catStyle.color}`}>
+                       <span className="text-5xl">{catStyle.icon}</span>
+                    </div>
+                  )}
+                  
+                  {/* Floating Availability Badge */}
+                  <div className="absolute top-3 right-3 z-20">
+                    <Badge className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md ${b.available_copies > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-transparent' : 'bg-rose-500 hover:bg-rose-600 text-white border-transparent'}`}>
                       {b.available_copies > 0 ? 'Available' : 'Borrowed'}
                     </Badge>
                   </div>
+                </div>
+                
+                <CardContent className="p-5 flex-1 flex flex-col gap-1.5 bg-white relative z-20">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{mainCat}</span>
+                  </div>
+                  <h3 className="font-bold text-slate-900 leading-tight line-clamp-2 group-hover:text-indigo-600 transition-colors">{b.title}</h3>
+                  <p className="text-xs font-medium text-slate-500 line-clamp-1">{b.author}</p>
+                  
                   {b.shelves && (
-                    <p className="text-xs text-slate-400 mt-2 line-clamp-1">
-                      ðŸ“ {b.shelves.name} - {b.shelves.location}
-                    </p>
+                    <div className="mt-3 flex items-start gap-1.5 text-xs text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <MapPin className="size-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2 leading-tight">Shelf <b>{b.shelves.name}</b> {b.shelves.location ? `(${b.shelves.location})` : ''}</span>
+                    </div>
                   )}
+                  
                   <div className="mt-auto pt-4 flex gap-2">
-                    <Button variant="outline" className="flex-1 rounded-xl text-xs" asChild>
-                      <Link href={`/dashboard/student/browse?search=${encodeURIComponent(b.title)}`}>Details</Link>
-                    </Button>
-                    <Button className="flex-1 rounded-xl text-xs bg-indigo-600 hover:bg-indigo-700"
+                    <Button className="w-full rounded-xl text-xs font-bold bg-slate-900 hover:bg-indigo-600 text-white shadow-md transition-colors"
                         disabled={b.available_copies === 0 || borrowingId === b.id}
-                        onClick={() => handleBorrowRequest(b)}>
-                        {borrowingId === b.id ? 'Processing...' : 'Borrow'}
+                        onClick={(e) => { e.preventDefault(); handleBorrowRequest(b); }}>
+                        {borrowingId === b.id ? 'Processing...' : 'Borrow Book'}
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            ))
+              )
+            })
           )}
         </div>
       </section>
 
-      {/* â”€â”€ Section 4: AI Chat Preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section className="bg-indigo-900 py-24 px-4 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 size-96 bg-violet-600 blur-[120px] rounded-full opacity-50 pointer-events-none" />
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-12 relative z-10">
+      {/* ── Section 4: AI Chat Preview ────────────────────────────────────────── */}
+      <section className="bg-slate-900 py-32 px-4 text-white relative overflow-hidden mt-12">
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-indigo-500/30 to-purple-500/30 blur-[120px] rounded-full pointer-events-none" />
+        
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-16 relative z-10">
           <div className="flex-1 flex flex-col gap-6">
-            <Badge className="bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/40 w-fit border-none px-3 py-1 text-xs">
-              <Bot className="size-3.5 mr-1.5" /> Introducing Libby
+            <Badge className="bg-white/10 text-white hover:bg-white/20 w-fit border border-white/20 px-4 py-1.5 text-xs rounded-full font-bold uppercase tracking-widest backdrop-blur-md">
+              <Bot className="size-4 mr-2 inline-block" /> Powered by Google Gemini
             </Badge>
-            <h2 className="text-3xl sm:text-4xl font-bold">Meet your new AI Librarian</h2>
-            <p className="text-indigo-200 text-lg leading-relaxed">
-              Don't know where to look? Just ask Libby! Our AI assistant knows exactly where every book is located on the shelves and if it's currently available.
+            <h2 className="text-4xl sm:text-5xl font-black leading-[1.1]">Meet Libby,<br/>Your AI Librarian</h2>
+            <p className="text-slate-300 text-lg leading-relaxed max-w-lg">
+              Don't know where to look? Just ask Libby! She knows exactly where every book is located on the shelves and if it's currently available in real-time.
             </p>
-            <div className="flex flex-col gap-3 mt-2">
-              <p className="text-sm font-medium text-white/80 uppercase tracking-wider">Try asking:</p>
+            <div className="flex flex-col gap-3 mt-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Try asking things like:</p>
               <div className="flex flex-wrap gap-2">
-                {['Where is Harry Potter?', 'Do you have science books?', 'What is available today?'].map(q => (
-                  <span key={q} className="bg-white/10 border border-white/20 rounded-full px-4 py-2 text-sm text-indigo-100">
-                    "{q}"
+                {['"Where is The Great Gatsby located?"', '"Do you have any books on Python?"', '"What fiction is available today?"'].map(q => (
+                  <span key={q} className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm text-slate-200 backdrop-blur-sm cursor-default hover:bg-white/10 transition-colors">
+                    {q}
                   </span>
                 ))}
               </div>
             </div>
-            <Button size="lg" className="bg-white text-indigo-900 hover:bg-slate-100 rounded-xl px-8 w-fit mt-4" asChild>
-              <Link href="/chat"><MessageSquare className="size-4 mr-2" /> Ask Libby Now</Link>
+            <Button size="lg" className="bg-white text-slate-900 hover:bg-slate-100 rounded-full px-8 w-fit mt-6 font-bold shadow-xl shadow-white/10" asChild>
+              <Link href="/chat"><MessageSquare className="size-4 mr-2" /> Chat with Libby Now</Link>
             </Button>
           </div>
-          <div className="flex-1 w-full max-w-sm">
-            <div className="bg-[#0f172a] rounded-2xl border border-white/10 shadow-2xl overflow-hidden shadow-indigo-900/50 flex flex-col h-80">
-              <div className="bg-[#1e293b] p-4 flex items-center gap-3 border-b border-white/5">
-                <div className="size-10 rounded-full bg-indigo-500 flex items-center justify-center shrink-0">
-                  <Bot className="size-5 text-white" />
+          
+          <div className="flex-1 w-full max-w-md relative">
+            <div className="absolute -inset-1 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-[2rem] blur-lg opacity-50"></div>
+            <div className="bg-slate-900/90 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden flex flex-col h-[400px] relative z-10">
+              <div className="bg-white/5 p-4 flex items-center gap-4 border-b border-white/10">
+                <div className="size-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shrink-0 shadow-inner border border-white/20">
+                  <Bot className="size-6 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold text-white">Libby</p>
-                  <p className="text-xs text-emerald-400">Online</p>
+                  <p className="font-bold text-white text-lg">Libby</p>
+                  <p className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse"></span> Online • AI Assistant
+                  </p>
                 </div>
               </div>
-              <div className="p-5 flex flex-col gap-4">
+              <div className="p-6 flex flex-col gap-5 flex-1 bg-gradient-to-b from-transparent to-black/20">
                 <div className="flex gap-3">
                   <div className="w-8 shrink-0" />
-                  <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-sm p-3 text-sm ml-auto">
+                  <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-sm p-4 text-sm ml-auto shadow-md">
                     Where is the Great Gatsby?
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <div className="size-8 rounded-full bg-[#1e293b] flex items-center justify-center shrink-0 border border-white/10">
+                  <div className="size-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0 border border-white/10 shadow-inner">
                     <Bot className="size-4 text-indigo-300" />
                   </div>
-                  <div className="bg-[#1e293b] text-slate-200 rounded-2xl rounded-tl-sm p-3 text-sm border border-white/5 shadow-sm">
-                    "The Great Gatsby" by F. Scott Fitzgerald is currently available! You can find it on Shelf "Fiction A-G" (Location: 2nd Floor, Isle 3).
+                  <div className="bg-slate-800 text-slate-200 rounded-2xl rounded-tl-sm p-4 text-sm border border-white/5 shadow-md leading-relaxed">
+                    "The Great Gatsby" by F. Scott Fitzgerald is currently available! You can find it on <b>Shelf "Fiction A-G"</b> (Location: 2nd Floor, Isle 3). Would you like to borrow it?
                   </div>
                 </div>
               </div>
@@ -311,46 +385,50 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* â”€â”€ Section 5: How it works â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <section className="bg-slate-50 py-24 px-4">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-slate-900 mb-12">How SchoolLib Works</h2>
+      {/* ── Section 5: How it works ─────────────────────────────────────────── */}
+      <section className="bg-white py-32 px-4 border-b border-slate-200">
+        <div className="max-w-6xl mx-auto text-center">
+          <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-200 border-none px-4 py-1.5 text-xs font-bold uppercase tracking-widest mb-6">Simple Process</Badge>
+          <h2 className="text-4xl font-black text-slate-900 mb-16 tracking-tight">How SchoolLib Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { icon: Search, title: '1. Search or Ask AI', desc: 'Find your book via our catalog or ask Libby the AI assistant.' },
-              { icon: MapPin, title: '2. Find the Shelf', desc: 'Get exact shelf locations and real-time availability status.' },
-              { icon: BookOpen, title: '3. Borrow & Read', desc: 'Place a borrow request and pick up your book from the library.' },
+              { icon: Search, title: 'Search or Ask AI', desc: 'Find your book instantly via our live catalog or ask Libby the AI assistant for highly personalized recommendations.' },
+              { icon: MapPin, title: 'Locate the Shelf', desc: 'Get exact physical shelf locations and real-time availability status so you never waste time searching the aisles.' },
+              { icon: BookOpen, title: 'Borrow & Read', desc: 'Place a borrow request with one click and simply pick up your book from the librarian desk.' },
             ].map((step, i) => (
-              <div key={i} className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="size-16 rounded-2xl bg-indigo-50 flex items-center justify-center">
+              <div key={i} className="flex flex-col items-center gap-5 bg-slate-50 p-10 rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                <div className="size-20 rounded-3xl bg-white shadow-md flex items-center justify-center border border-slate-100 relative">
+                  <div className="absolute -top-3 -right-3 size-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-md">{i + 1}</div>
                   <step.icon className="size-8 text-indigo-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900">{step.title}</h3>
-                <p className="text-slate-500 text-sm">{step.desc}</p>
+                <h3 className="text-xl font-black text-slate-900">{step.title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{step.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* â”€â”€ Section 6: Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <footer className="bg-white border-t border-slate-200 py-12 px-4">
+      {/* ── Section 6: Footer ─────────────────────────────────────────────── */}
+      <footer className="bg-slate-50 py-12 px-4">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <BookOpen className="size-6 text-indigo-600" />
-            <span className="font-bold text-lg text-slate-900">SchoolLib</span>
+            <div className="size-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+               <BookOpen className="size-4 text-white" />
+            </div>
+            <span className="font-black text-xl text-slate-900 tracking-tight">SchoolLib</span>
           </div>
-          <div className="flex gap-6 text-sm text-slate-500">
-            <Link href="/" className="hover:text-indigo-600">Home</Link>
-            <Link href="/chat" className="hover:text-indigo-600">AI Chat</Link>
-            <Link href="/login" className="hover:text-indigo-600">Admin/Staff Login</Link>
+          <div className="flex gap-8 text-sm font-semibold text-slate-500">
+            <Link href="/" className="hover:text-indigo-600 transition-colors">Home</Link>
+            <Link href="/chat" className="hover:text-indigo-600 transition-colors">AI Chat</Link>
+            <Link href="/login" className="hover:text-indigo-600 transition-colors">Admin / Staff Login</Link>
           </div>
-          <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 gap-1.5 py-1">
-            <Bot className="size-3" /> Powered by AI
+          <Badge variant="outline" className="bg-white text-slate-500 border-slate-200 gap-2 py-1.5 px-4 rounded-full shadow-sm">
+            <Bot className="size-4 text-indigo-500" /> Powered by AI
           </Badge>
         </div>
-        <div className="max-w-6xl mx-auto mt-8 text-center text-xs text-slate-400">
-          Â© {new Date().getFullYear()} School Library System. All rights reserved.
+        <div className="max-w-6xl mx-auto mt-12 text-center text-sm font-medium text-slate-400">
+          &copy; {new Date().getFullYear()} School Library System. All rights reserved.
         </div>
       </footer>
     </div>
