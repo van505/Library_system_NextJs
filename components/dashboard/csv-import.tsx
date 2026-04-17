@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity, ACTION_TYPES } from '@/lib/activityLog'
 import { useAuthStore } from '@/lib/store'
@@ -31,6 +31,50 @@ type ParsedRow = {
   categoryIds?: string[]
 }
 
+function LiveReferencePanel({ supabase }: { supabase: any }) {
+  const [shelves, setShelves] = useState<string[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+
+  useEffect(() => {
+    async function load() {
+      const [s, c] = await Promise.all([
+        supabase.from('shelves').select('name').order('name'),
+        supabase.from('categories').select('name').order('name')
+      ])
+      setShelves((s.data || []).map((x: any) => x.name))
+      setCategories((c.data || []).map((x: any) => x.name))
+    }
+    load()
+  }, [])
+
+  if (shelves.length === 0 && categories.length === 0) return null
+
+  return (
+    <div className="grid grid-cols-2 gap-3 bg-blue-50/60 border border-blue-100 rounded-xl p-4">
+      <div>
+        <p className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-2">✓ Valid Shelf Names</p>
+        <div className="flex flex-wrap gap-1.5">
+          {shelves.length === 0
+            ? <span className="text-xs text-slate-400 italic">No shelves found</span>
+            : shelves.map(s => (
+              <code key={s} className="text-[11px] bg-white border border-blue-200 text-blue-800 px-2 py-0.5 rounded-md font-mono">{s}</code>
+            ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-[11px] font-bold text-violet-700 uppercase tracking-wider mb-2">✓ Valid Category Names</p>
+        <div className="flex flex-wrap gap-1.5">
+          {categories.length === 0
+            ? <span className="text-xs text-slate-400 italic">No categories found</span>
+            : categories.map(c => (
+              <code key={c} className="text-[11px] bg-white border border-violet-200 text-violet-800 px-2 py-0.5 rounded-md font-mono">{c}</code>
+            ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CSVImportDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<1 | 2>(1)
@@ -42,10 +86,16 @@ export function CSVImportDialog({ onSuccess }: { onSuccess: () => void }) {
   const supabase = createClient()
   const profile = useAuthStore(s => s.profile)
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    // Fetch real shelves and categories for the template
+    const liveData = await loadLiveDbData()
+    const firstShelf = liveData.shelves[0]?.name ?? 'Shelf A'
+    const firstCat = liveData.categories[0]?.name ?? 'Fiction'
+    const secondCat = liveData.categories[1]?.name ?? 'Drama'
+
     const csvContent = [
       'title,author,isbn,description,total_copies,shelf_name,category_names,cover_url,published_year,condition',
-      '"Clean Code","Robert C. Martin","9780132350884","A handbook of agile software craftsmanship",3,"IT-C-01","Programming,Computer Science","https://example.com/cover.jpg",2008,"good"'
+      `"Clean Code","Robert C. Martin","9780132350884","A handbook of agile software craftsmanship",3,"${firstShelf}","${firstCat},${secondCat}","",2008,"good"`
     ].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -79,52 +129,57 @@ export function CSVImportDialog({ onSuccess }: { onSuccess: () => void }) {
       skipEmptyLines: true,
       complete: (results) => {
         const rows = results.data as CsvRow[]
-        const validated: ParsedRow[] = rows.map((row, index) => {
+        const validated: ParsedRow[] = rows.map((row) => {
           let isValid = true
           let error = ''
           let shelfId = ''
           let categoryIds: string[] = []
 
-          if (!row.title) { isValid = false; error = 'Missing title' }
-          else if (!row.author) { isValid = false; error = 'Missing author' }
-          else if (!row.shelf_name) { isValid = false; error = 'Missing shelf_name' }
-          else if (!row.category_names) { isValid = false; error = 'Missing category_names' }
+          if (!row.title?.trim()) { isValid = false; error = 'Missing title' }
+          else if (!row.author?.trim()) { isValid = false; error = 'Missing author' }
           else {
             const copies = parseInt(row.total_copies)
             if (isNaN(copies) || copies <= 0) {
               isValid = false
-              error = 'Invalid total_copies'
+              error = 'total_copies must be a number > 0'
             } else {
-              // Validate shelf
-              const shelf = liveData.shelves.find((s: any) => s.name.toUpperCase() === row.shelf_name?.toUpperCase())
-              if (!shelf) {
-                isValid = false
-                error = `Shelf '${row.shelf_name}' not found`
-              } else {
-                shelfId = shelf.id
+              // Shelf is OPTIONAL — only validate if provided
+              if (row.shelf_name?.trim()) {
+                const shelf = liveData.shelves.find((s: any) =>
+                  s.name.toLowerCase().trim() === row.shelf_name.toLowerCase().trim()
+                )
+                if (!shelf) {
+                  isValid = false
+                  const available = liveData.shelves.map((s: any) => s.name).join(', ')
+                  error = `Shelf "${row.shelf_name}" not found. Available: ${available || 'none'}`
+                } else {
+                  shelfId = shelf.id
+                }
               }
 
-              // Validate categories
-              if (isValid) {
-                const catNames = row.category_names.split(',').map(c => c.trim().toUpperCase())
+              // Categories are OPTIONAL — only validate if provided
+              if (isValid && row.category_names?.trim()) {
+                const catNames = row.category_names.split(',').map((c: string) => c.trim())
                 for (const catName of catNames) {
-                  const cat = liveData.categories.find((c: any) => c.name.toUpperCase() === catName)
+                  if (!catName) continue
+                  const cat = liveData.categories.find((c: any) =>
+                    c.name.toLowerCase().trim() === catName.toLowerCase().trim()
+                  )
                   if (!cat) {
                     isValid = false
-                    error = `Category '${catName}' not found`
+                    const available = liveData.categories.map((c: any) => c.name).join(', ')
+                    error = `Category "${catName}" not found. Available: ${available || 'none'}`
                     break
                   }
                   categoryIds.push(cat.id)
                 }
               }
 
-              // Validate condition
-              if (isValid) {
-                const cond = (row.condition || 'good').toLowerCase()
-                if (!['excellent', 'good', 'fair', 'damaged'].includes(cond)) {
-                  isValid = false
-                  error = `Invalid condition '${cond}'`
-                }
+              // Condition defaults to 'good' if not provided or invalid
+              const cond = (row.condition || 'good').toLowerCase().trim()
+              if (!['excellent', 'good', 'fair', 'damaged'].includes(cond)) {
+                // Don't fail — just warn and default to good
+                row.condition = 'good'
               }
             }
           }
@@ -136,8 +191,8 @@ export function CSVImportDialog({ onSuccess }: { onSuccess: () => void }) {
         setStep(1)
         setLoading(false)
       },
-      error: (error) => {
-        toast.error(`CSV Parsing error: ${error.message}`)
+      error: (err) => {
+        toast.error('CSV Parsing error: ' + err.message)
         setLoading(false)
       }
     })
@@ -244,6 +299,9 @@ export function CSVImportDialog({ onSuccess }: { onSuccess: () => void }) {
               <p className="text-xs text-slate-500 mt-1">.csv formats only</p>
             </div>
             {loading && <p className="text-sm text-center text-primary mt-2 animate-pulse">Processing file against database...</p>}
+
+            {/* Live Reference Panel */}
+            <LiveReferencePanel supabase={supabase} />
           </div>
         )}
 

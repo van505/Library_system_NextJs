@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts'
 import { Download, Book, Users, CalendarCheck, AlertTriangle, Activity } from 'lucide-react'
 import Papa from 'papaparse'
 import { format, subDays, startOfDay, isPast } from 'date-fns'
@@ -198,13 +198,35 @@ export default function AdminReportsPage() {
               </Card>
             </div>
 
-            <div className="h-[300px] w-full border border-slate-100 rounded-2xl p-4 bg-slate-50/50 flex flex-col justify-end relative">
-               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 absolute top-4 left-4">Recent Velocity (14 Days)</h3>
-               <ResponsiveContainer width="100%" height="85%">
-                  <LineChart data={checkoutTrend}>
-                    <Line type="monotone" dataKey="checkoutCount" stroke="#8b5cf6" strokeWidth={4} dot={{ strokeWidth: 2, r: 4, fill: '#fff' }} fill="#8b5cf6" />
-                  </LineChart>
-               </ResponsiveContainer>
+            <div className="rounded-2xl overflow-hidden border border-slate-100 bg-white shadow-sm">
+              <div className="px-6 pt-5 pb-2 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Books Issued — Last 14 Days</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Daily checkout velocity across all staff</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-medium text-violet-600 bg-violet-50 px-3 py-1.5 rounded-full">
+                  <span className="size-2 rounded-full bg-violet-500 inline-block"></span> Checkouts
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={checkoutTrend} margin={{ top: 10, right: 24, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={6} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} dx={-4} />
+                  <RechartsTooltip
+                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgb(0 0 0 / 0.08)', fontSize: 12 }}
+                    labelStyle={{ fontWeight: 700, color: '#1e293b', marginBottom: 2 }}
+                    itemStyle={{ color: '#8b5cf6' }}
+                  />
+                  <Area type="monotone" dataKey="checkoutCount" name="Books Issued" stroke="#8b5cf6" strokeWidth={2.5} fill="url(#velocityGrad)" dot={false} activeDot={{ r: 5, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </TabsContent>
 
