@@ -18,8 +18,77 @@ import { logActivity, ACTION_TYPES } from '@/lib/activityLog'
 import { useAuthStore } from '@/lib/store'
 import { CSVImportDialog } from '@/components/dashboard/csv-import'
 import { QRDialog } from '@/components/dashboard/qr-dialog'
-import { BookOpen, Search, Plus, Trash2, Edit, Filter, X, Link as LinkIcon, Upload, ImageIcon } from 'lucide-react'
+import { BookOpen, Search, Plus, Trash2, Edit, Filter, X, Link as LinkIcon, Upload, Star, Crown } from 'lucide-react'
 import type { Shelf, Category } from '@/lib/supabase'
+
+type TagItem = { id: string; name: string; color: string }
+
+// ── Tag multi-select picker (similar to CategoryPicker) ─────────────────────
+ function TagPicker({
+  allTags,
+  selected,
+  onChange,
+}: {
+  allTags: TagItem[]
+  selected: TagItem[]
+  onChange: (tags: TagItem[]) => void
+}) {
+  const [query, setQuery] = React.useState('')
+  const unselected = allTags.filter(
+    t => !selected.some(s => s.id === t.id) &&
+      t.name.toLowerCase().includes(query.toLowerCase())
+  )
+
+  function add(tag: TagItem) { onChange([...selected, tag]); setQuery('') }
+  function remove(id: string) { onChange(selected.filter(t => t.id !== id)) }
+
+  return (
+    <div className="space-y-2">
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {selected.map(tag => (
+            <span
+              key={tag.id}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
+              style={{ backgroundColor: `${tag.color}25`, color: tag.color, border: `1px solid ${tag.color}50` }}
+            >
+              {tag.name}
+              <button type="button" onClick={() => remove(tag.id)} className="ml-0.5 hover:opacity-70">
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <Input
+        className="rounded-xl text-sm h-9"
+        placeholder="Search tags..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+      {query.trim() && (
+        <div className="border border-slate-200 rounded-xl overflow-hidden max-h-36 overflow-y-auto shadow-sm">
+          {unselected.length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-3">No matching tags</p>
+          ) : unselected.map(tag => (
+            <button
+              key={tag.id}
+              type="button"
+              onClick={() => add(tag)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 transition-colors text-left"
+            >
+              <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {allTags.length === 0 && (
+        <p className="text-xs text-slate-400 text-center py-1">No tags yet. Create tags from Manage Tags.</p>
+      )}
+    </div>
+  )
+}
 
 type BookRow = {
   id: string
@@ -35,6 +104,9 @@ type BookRow = {
   published_year: string | null
   publisher: string | null
   created_at: string
+  is_featured: boolean
+  is_book_of_month: boolean
+  featured_note: string | null
   shelves?: { name: string; location: string } | null
   book_categories?: { categories: Category }[]
 }
@@ -252,24 +324,36 @@ export default function AdminBooksPage() {
   const [coverUrl, setCoverUrl] = React.useState('')
   const [pendingFile, setPendingFile] = React.useState<File | null>(null)
   const [saving, setSaving] = React.useState(false)
+  // Feature W: Visibility fields
+  const [isFeatured, setIsFeatured] = React.useState(false)
+  const [isBookOfMonth, setIsBookOfMonth] = React.useState(false)
+  const [featuredNote, setFeaturedNote] = React.useState('')
+  // Feature W: Filter chips
+  const [filterFeatured, setFilterFeatured] = React.useState(false)
+  const [filterBOTM, setFilterBOTM] = React.useState(false)
+
+  const [allTags, setAllTags] = React.useState<TagItem[]>([])
+  const [selectedTags, setSelectedTags] = React.useState<TagItem[]>([])
 
   const [categoriesDbCount, setCategoriesDbCount] = React.useState(0)
 
   async function loadData() {
     setLoading(true)
-    const [bRes, sRes, cRes, cCount] = await Promise.all([
+    const [bRes, sRes, cRes, cCount, tRes] = await Promise.all([
       supabase
         .from('books')
-        .select('*, shelves(name, location), book_categories(categories(*))')
+        .select('*, shelves(name, location), book_categories(categories(*)), book_tags(tags(*))')
         .order('created_at', { ascending: false }),
       supabase.from('shelves').select('*').order('name'),
       supabase.from('categories').select('*').order('name'),
       supabase.from('categories').select('*', { count: 'exact', head: true }),
+      supabase.from('tags').select('*').order('name'),
     ])
     setBooks((bRes.data ?? []) as BookRow[])
     setShelves(sRes.data ?? [])
     setAllCategories(cRes.data ?? [])
     setCategoriesDbCount(cCount.count ?? 0)
+    setAllTags(tRes.data ?? [])
     setLoading(false)
   }
 
@@ -291,6 +375,8 @@ export default function AdminBooksPage() {
     setTitle(''); setAuthor(''); setIsbn(''); setDescription('')
     setSelectedCats([]); setShelfId(''); setPublisher(''); setYear('')
     setTotalCopies('1'); setCoverUrl(''); setPendingFile(null)
+    setIsFeatured(false); setIsBookOfMonth(false); setFeaturedNote('')
+    setSelectedTags([])
   }
 
   function openCreate() {
@@ -304,7 +390,12 @@ export default function AdminBooksPage() {
     setPublisher(b.publisher || ''); setYear(b.published_year || '')
     setTotalCopies(b.total_copies.toString()); setCoverUrl(b.cover_url || '')
     setPendingFile(null)
-
+    setIsFeatured(b.is_featured ?? false)
+    setIsBookOfMonth(b.is_book_of_month ?? false)
+    setFeaturedNote(b.featured_note || '')
+    // Pre-fill tags
+    const bTags = ((b as any).book_tags ?? []).map((bt: any) => bt.tags).filter(Boolean)
+    setSelectedTags(bTags)
     // Pre-fill categories from book_categories join
     const cats = (b.book_categories ?? []).map((bc: any) => bc.categories).filter(Boolean)
     setSelectedCats(cats)
@@ -342,6 +433,8 @@ export default function AdminBooksPage() {
           shelf_id: shelfId || null, publisher: publisher || null,
           published_year: year || null, total_copies: copiesNum,
           available: copiesNum > 0, cover_url: finalCoverUrl,
+          is_featured: isFeatured, is_book_of_month: isBookOfMonth,
+          featured_note: featuredNote || null,
         }).eq('id', bookId)
         if (error) throw error
 
@@ -354,6 +447,8 @@ export default function AdminBooksPage() {
           shelf_id: shelfId || null, publisher: publisher || null,
           published_year: year || null, total_copies: copiesNum,
           available_copies: copiesNum, available: copiesNum > 0,
+          is_featured: isFeatured, is_book_of_month: isBookOfMonth,
+          featured_note: featuredNote || null,
           cover_url: null,
         }).select('id').single()
         if (error || !data) throw error || new Error('Failed to create book')
@@ -371,6 +466,16 @@ export default function AdminBooksPage() {
         }
       }
 
+      // Sync book_tags: delete old, insert new
+      if (isEditing && editingId) {
+        await supabase.from('book_tags').delete().eq('book_id', bookId)
+      }
+      if (selectedTags.length > 0) {
+        await supabase.from('book_tags').insert(
+          selectedTags.map(t => ({ book_id: bookId, tag_id: t.id }))
+        )
+      }
+
       // Insert category pivot rows
       if (selectedCats.length > 0) {
         const rows = selectedCats.map(c => ({ book_id: bookId, category_id: c.id }))
@@ -379,7 +484,7 @@ export default function AdminBooksPage() {
       }
 
       await logActivity(supabase, {
-        performed_by: useAuthStore.getState().profile?.id,
+        performed_by: useAuthStore.getState().profile?.id ?? '',
         role: 'admin',
         action_type: isEditing ? ACTION_TYPES.BOOK_EDITED : ACTION_TYPES.BOOK_ADDED,
         entity_type: 'book',
@@ -391,10 +496,37 @@ export default function AdminBooksPage() {
       toast.success(isEditing ? 'Book updated' : 'Book added')
       setIsOpen(false)
       loadData()
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save book')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save book')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Feature W: Toggle is_featured
+  async function toggleFeatured(b: BookRow) {
+    const { error } = await supabase
+      .from('books')
+      .update({ is_featured: !b.is_featured })
+      .eq('id', b.id)
+    if (error) toast.error(error.message)
+    else {
+      toast.success(!b.is_featured ? `"${b.title}" marked as Featured` : `"${b.title}" removed from Featured`)
+      loadData()
+    }
+  }
+
+  // Feature W: Set as Book of the Month
+  async function setBookOfMonth(b: BookRow) {
+    if (!confirm(`Set "${b.title}" as Book of the Month?\n\nThis will replace the current Book of the Month.`)) return
+    const { error } = await supabase
+      .from('books')
+      .update({ is_book_of_month: true })
+      .eq('id', b.id)
+    if (error) toast.error(error.message)
+    else {
+      toast.success(`"${b.title}" is now the Book of the Month! 🏆`)
+      loadData()
     }
   }
 
@@ -404,7 +536,7 @@ export default function AdminBooksPage() {
     if (error) toast.error(error.message)
     else { 
       await logActivity(supabase, {
-        performed_by: useAuthStore.getState().profile?.id,
+        performed_by: useAuthStore.getState().profile?.id ?? '',
         role: 'admin',
         action_type: ACTION_TYPES.BOOK_DELETED,
         entity_type: 'book',
@@ -424,7 +556,7 @@ export default function AdminBooksPage() {
     if (error) toast.error(error.message)
     else { 
       await logActivity(supabase, {
-        performed_by: useAuthStore.getState().profile?.id,
+        performed_by: useAuthStore.getState().profile?.id ?? '',
         role: 'admin',
         action_type: ACTION_TYPES.BOOK_DELETED,
         entity_type: 'book',
@@ -449,7 +581,9 @@ export default function AdminBooksPage() {
     const bookCatIds = (b.book_categories ?? []).map((bc: any) => bc.categories?.id).filter(Boolean)
     const matchCat = filterCatId === 'all' || bookCatIds.includes(filterCatId)
     const matchShelf = filterShelf === 'all' || b.shelf_id === filterShelf
-    return matchSearch && matchCat && matchShelf
+    const matchFeatured = !filterFeatured || b.is_featured
+    const matchBOTM = !filterBOTM || b.is_book_of_month
+    return matchSearch && matchCat && matchShelf && matchFeatured && matchBOTM
   })
 
   const totalAcc = books.length
@@ -538,6 +672,16 @@ export default function AdminBooksPage() {
                   />
                 </div>
 
+                {/* Tags multi-select (Feature T) */}
+                <div className="space-y-2">
+                  <Label>Tags</Label>
+                  <TagPicker
+                    allTags={allTags}
+                    selected={selectedTags}
+                    onChange={setSelectedTags}
+                  />
+                </div>
+
                 {/* Cover image */}
                 <div className="space-y-2">
                   <Label>Cover Image</Label>
@@ -558,6 +702,34 @@ export default function AdminBooksPage() {
                     rows={3}
                     placeholder="Brief description of the book..."
                   />
+                </div>
+
+                {/* Visibility (Feature W) */}
+                <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-slate-700">Visibility</p>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} className="rounded" />
+                    <span className="text-sm text-slate-700 flex items-center gap-1.5">
+                      <Star className="size-4 text-amber-500" /> Mark as Featured
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={isBookOfMonth} onChange={e => setIsBookOfMonth(e.target.checked)} className="rounded" />
+                    <span className="text-sm text-slate-700 flex items-center gap-1.5">
+                      <Crown className="size-4 text-amber-600" /> Set as Book of the Month
+                    </span>
+                  </label>
+                  {(isFeatured || isBookOfMonth) && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Featured Note (Optional)</Label>
+                      <Input
+                        value={featuredNote}
+                        onChange={e => setFeaturedNote(e.target.value)}
+                        className="rounded-xl text-sm"
+                        placeholder="e.g. Staff pick for April — a must read!"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <Button type="submit" disabled={saving} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl h-11 transition-transform hover:-translate-y-0.5">
@@ -608,6 +780,22 @@ export default function AdminBooksPage() {
             {shelves.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        <button
+          onClick={() => setFilterFeatured(p => !p)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all h-9 ${
+            filterFeatured ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-200'
+          }`}
+        >
+          <Star className="size-3.5" /> Featured
+        </button>
+        <button
+          onClick={() => setFilterBOTM(p => !p)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all h-9 ${
+            filterBOTM ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-200'
+          }`}
+        >
+          <Crown className="size-3.5" /> Book of Month
+        </button>
       </div>
 
       {/* Table */}
@@ -646,6 +834,7 @@ export default function AdminBooksPage() {
               </tr>
             ) : filtered.map(b => {
               const cats = (b.book_categories ?? []).map((bc: any) => bc.categories).filter(Boolean)
+              const bTags = ((b as any).book_tags ?? []).map((bt: any) => bt.tags).filter(Boolean)
               const firstCat = cats[0]
               const fallbackColor = firstCat?.color || '#cbd5e1'
 
@@ -666,8 +855,12 @@ export default function AdminBooksPage() {
                         )}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 leading-tight line-clamp-1">{b.title}</p>
-                        <p className="text-slate-500 text-xs mt-0.5">{b.author}</p>
+                        <div className="flex items-center gap-1 mb-0.5">
+                          {b.is_book_of_month && <Crown className="size-3 text-amber-600" />}
+                          {b.is_featured && !b.is_book_of_month && <Star className="size-3 text-amber-500 fill-amber-400" />}
+                          <p className="font-bold text-slate-900 leading-tight line-clamp-1">{b.title}</p>
+                        </div>
+                        <p className="text-slate-500 text-xs">{b.author}</p>
                       </div>
                     </div>
                   </td>
@@ -687,6 +880,21 @@ export default function AdminBooksPage() {
                         </Badge>
                       ))}
                     </div>
+                    {/* Tag pills (Feature T) */}
+                    {bTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {bTags.slice(0, 3).map((tag: TagItem) => (
+                          <span
+                            key={tag.id}
+                            className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                          >{tag.name}</span>
+                        ))}
+                        {bTags.length > 3 && (
+                          <span className="text-[9px] text-slate-400 font-bold">+{bTags.length - 3}</span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="p-4 text-slate-600 text-xs text-nowrap">{(b.shelves as any)?.name || '—'}</td>
                   <td className="p-4 text-slate-600 text-xs">
@@ -701,6 +909,25 @@ export default function AdminBooksPage() {
                     </Badge>
                   </td>
                   <td className="p-4 text-right">
+                    {/* Feature W: Star (featured) and Crown (BOTM) buttons */}
+                    <button
+                      onClick={() => toggleFeatured(b)}
+                      title={b.is_featured ? 'Remove from Featured' : 'Mark as Featured'}
+                      className={`inline-flex items-center justify-center size-8 rounded-lg transition-colors ${
+                        b.is_featured ? 'text-amber-500 hover:text-amber-600 bg-amber-50' : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50'
+                      }`}
+                    >
+                      <Star className={`size-4 ${b.is_featured ? 'fill-amber-400' : ''}`} />
+                    </button>
+                    <button
+                      onClick={() => setBookOfMonth(b)}
+                      title={b.is_book_of_month ? 'Current Book of the Month' : 'Set as Book of the Month'}
+                      className={`inline-flex items-center justify-center size-8 rounded-lg transition-colors ${
+                        b.is_book_of_month ? 'text-amber-600 bg-amber-100' : 'text-slate-300 hover:text-amber-500 hover:bg-amber-50'
+                      }`}
+                    >
+                      <Crown className="size-4" />
+                    </button>
                     <QRDialog 
                       bookId={b.id} 
                       bookTitle={b.title} 

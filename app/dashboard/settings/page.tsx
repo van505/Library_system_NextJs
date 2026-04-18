@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch'
 import { createClient } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
-import { Settings, Moon, Sun, Monitor, Bell, Lock, BookOpen, Shield } from 'lucide-react'
+import { Settings, Moon, Sun, Monitor, Bell, Lock, BookOpen, Shield, Library, Globe } from 'lucide-react'
+import { useLanguage, LANGUAGES } from '@/lib/i18n/LanguageContext'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -36,6 +37,7 @@ function applyAccent(accent: string) {
 export default function SettingsPage() {
   const supabase = createClient()
   const { profile } = useAuthStore()
+  const { lang, setLang } = useLanguage()
   const role = profile?.role ?? 'student'
 
   const [activeTab, setActiveTab] = React.useState<'general' | 'security' | 'preferences'>('general')
@@ -56,6 +58,42 @@ export default function SettingsPage() {
 
   function handleThemeChange(t: Theme) { setTheme(t); applyTheme(t) }
   function handleAccentChange(a: string) { setAccent(a); applyAccent(a) }
+
+  // ── Borrow Limit (admin only) ────────────────────────────────────────────
+  const [globalBorrowLimit, setGlobalBorrowLimit] = React.useState(3)
+  const [savingLimit, setSavingLimit] = React.useState(false)
+
+  React.useEffect(() => {
+    if (role !== 'admin') return
+    supabase
+      .from('library_settings')
+      .select('setting_value')
+      .eq('setting_key', 'default_borrow_limit')
+      .single()
+      .then(({ data }) => {
+        if (data) setGlobalBorrowLimit(parseInt(data.setting_value))
+      })
+  }, [role, supabase])
+
+  async function saveGlobalLimit() {
+    setSavingLimit(true)
+    try {
+      const res = await fetch('/api/admin/update-borrow-limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: globalBorrowLimit }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        toast.error(json.error ?? 'Failed to save limit')
+      } else {
+        toast.success(`Borrow limit set to ${globalBorrowLimit} — ${json.studentsUpdated} student(s) updated!`)
+      }
+    } catch {
+      toast.error('Network error — could not save limit')
+    }
+    setSavingLimit(false)
+  }
 
   // ── Notification Preferences ───────────────────────────────────────────
   const [notifEmail, setNotifEmail] = React.useState(true)
@@ -201,6 +239,76 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Language Preference (Feature DD) */}
+          <Card className="rounded-2xl border-slate-200 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base"><Globe className="size-4 text-slate-600" /> Language Preference</CardTitle>
+              <CardDescription>Choose the language for the SchoolLib interface.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {LANGUAGES.map(l => (
+                  <button
+                    key={l.code}
+                    onClick={() => setLang(l.code)}
+                    className={`flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all ${
+                      lang === l.code
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                    }`}
+                  >
+                    <span className="text-2xl">{l.flag}</span>
+                    <div>
+                      <p className="font-bold text-sm">{l.label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{l.code.toUpperCase()}</p>
+                    </div>
+                    {lang === l.code && (
+                      <div className="ml-auto size-4 rounded-full bg-primary flex items-center justify-center">
+                        <svg className="size-2.5 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Library Rules (admin only) */}
+          {role === 'admin' && (
+            <Card className="rounded-2xl border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base"><Library className="size-4 text-slate-600" /> Library Rules</CardTitle>
+                <CardDescription>Configure borrowing limits and library-wide policies.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Default Borrowing Limit</Label>
+                  <p className="text-xs text-slate-500 mb-3">Maximum books any student can borrow at once. Applies to all students unless individually overridden.</p>
+                  <div className="flex gap-3 items-center">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={globalBorrowLimit}
+                      onChange={e => setGlobalBorrowLimit(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                      className="w-24 rounded-xl text-center font-bold text-lg"
+                    />
+                    <span className="text-sm text-slate-500">books per student</span>
+                    <Button onClick={saveGlobalLimit} disabled={savingLimit} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl ml-auto">
+                      {savingLimit ? 'Saving...' : 'Save Limit'}
+                    </Button>
+                  </div>
+                </div>
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-sm font-medium text-slate-700 mb-1">Per-Student Override</p>
+                  <p className="text-xs text-slate-500">To set a custom limit for an individual student, go to <strong>Manage Staff → Students</strong> and click &ldquo;Edit Borrow Limit&rdquo; on the student row.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Notifications */}
           <Card className="rounded-2xl border-slate-200 shadow-sm">

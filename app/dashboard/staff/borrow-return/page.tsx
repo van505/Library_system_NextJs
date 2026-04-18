@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { format, isPast, differenceInDays, addDays } from 'date-fns'
 import { toInputDate, getMinReturnDate, getMaxReturnDate, validateReturnDate } from '@/lib/dateUtils'
+import { checkBorrowingLimit } from '@/lib/borrowingLimit'
 
 export default function StaffTransactionsPage() {
   const supabase = createClient()
@@ -69,6 +70,12 @@ export default function StaffTransactionsPage() {
   // ── Return Dialog State ────────────────────────────────────────────────
   const [returnDialogOpen, setReturnDialogOpen] = React.useState(false)
   const [returnTarget, setReturnTarget] = React.useState<{ txId: string; bookId: string; studentId: string | null; bookTitle: string } | null>(null)
+
+  // ── Borrow Limit Override Dialog ───────────────────────────────────────
+  const [limitOverrideOpen, setLimitOverrideOpen] = React.useState(false)
+  const [limitOverrideReason, setLimitOverrideReason] = React.useState('')
+  const [limitOverridePending, setLimitOverridePending] = React.useState<'issue' | 'approve' | 'edit-approve' | null>(null)
+  const [limitOverrideInfo, setLimitOverrideInfo] = React.useState<{ current: number; limit: number; name: string } | null>(null)
 
   // ── Load Transactions ──────────────────────────────────────────────────
   async function loadTransactions() {
@@ -135,12 +142,36 @@ export default function StaffTransactionsPage() {
     setDueDate(toInputDate(addDays(new Date(), 14))); setNotes(''); setIsOpen(true)
   }
 
+  // ── Confirm override and proceed with pending action ──────────────────
+  async function handleLimitOverrideConfirm() {
+    setLimitOverrideOpen(false)
+    if (limitOverridePending === 'issue') await doIssueBook()
+    else if (limitOverridePending === 'approve' && editTarget) await doApproveReservation(editTarget, editDate || undefined)
+    else if (limitOverridePending === 'edit-approve') await handleEditApprove(true)
+    setLimitOverridePending(null)
+    setLimitOverrideReason('')
+  }
+
   // ── Physical Walk-in Issue ─────────────────────────────────────────────
   async function handleBorrowSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedStudent || !selectedBook) { toast.error('Please select both a student and a book.'); return }
     const err = validateReturnDate(dueDate)
     if (err) { toast.error(err); return }
+
+    // Check borrow limit
+    const limitCheck = await checkBorrowingLimit(supabase, selectedStudent.id)
+    if (!limitCheck.allowed) {
+      setLimitOverrideInfo({ current: limitCheck.current, limit: limitCheck.limit, name: selectedStudent.full_name })
+      setLimitOverridePending('issue')
+      setLimitOverrideOpen(true)
+      return
+    }
+    await doIssueBook()
+  }
+
+  async function doIssueBook() {
+    if (!selectedStudent || !selectedBook) return
     setBorrowing(true)
 
     const { error: txError } = await supabase.from('transactions').insert({
@@ -180,9 +211,24 @@ export default function StaffTransactionsPage() {
 
   // ── Approve (as-is, use proposed_return_date) ─────────────────────────
   async function handleApprove(r: any) {
+    // Check borrow limit before approving
+    if (r.user_id) {
+      const limitCheck = await checkBorrowingLimit(supabase, r.user_id)
+      if (!limitCheck.allowed) {
+        setEditTarget(r)
+        setLimitOverrideInfo({ current: limitCheck.current, limit: limitCheck.limit, name: r.profile?.full_name ?? 'Student' })
+        setLimitOverridePending('approve')
+        setLimitOverrideOpen(true)
+        return
+      }
+    }
+    await doApproveReservation(r)
+  }
+
+  async function doApproveReservation(r: any, overrideDueDate?: string) {
     const bk = r.books as any
     const bookTitle = bk?.title ?? r.book_title
-    const dueDateStr = r.proposed_return_date ?? toInputDate(addDays(new Date(), 14))
+    const dueDateStr = overrideDueDate ?? r.proposed_return_date ?? toInputDate(addDays(new Date(), 14))
 
     const { error: reqErr } = await supabase.from('book_requests').update({ status: 'approved', approved_return_date: dueDateStr }).eq('id', r.id)
     if (reqErr) { toast.error(reqErr.message); return }
@@ -231,10 +277,22 @@ export default function StaffTransactionsPage() {
     setEditApproveOpen(true)
   }
 
-  async function handleEditApprove() {
+  async function handleEditApprove(skipLimitCheck = false) {
     const err = validateReturnDate(editDate)
     if (err) { setEditDateError(err); return }
     if (!editTarget) return
+
+    // Check borrow limit unless staff already confirmed override
+    if (!skipLimitCheck && editTarget.user_id) {
+      const limitCheck = await checkBorrowingLimit(supabase, editTarget.user_id)
+      if (!limitCheck.allowed) {
+        setLimitOverrideInfo({ current: limitCheck.current, limit: limitCheck.limit, name: editTarget.profile?.full_name ?? 'Student' })
+        setLimitOverridePending('edit-approve')
+        setLimitOverrideOpen(true)
+        return
+      }
+    }
+
     setEditApproving(true)
 
     const bk = editTarget.books as any
@@ -643,7 +701,7 @@ export default function StaffTransactionsPage() {
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setEditApproveOpen(false)}>Cancel</Button>
               <Button className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white"
-                onClick={handleEditApprove}
+                onClick={() => handleEditApprove(false)}
                 disabled={editApproving || !!editDateError || !editDate}>
                 {editApproving ? 'Approving...' : 'Confirm'}
               </Button>
@@ -692,6 +750,34 @@ export default function StaffTransactionsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleArchive} className="bg-amber-600 hover:bg-amber-700">Archive</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Borrow Limit Override Dialog ── */}
+      <AlertDialog open={limitOverrideOpen} onOpenChange={open => { if (!open) { setLimitOverrideOpen(false); setLimitOverridePending(null) } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="size-5" /> Borrowing Limit Exceeded
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              <strong>{limitOverrideInfo?.name}</strong> currently has <strong>{limitOverrideInfo?.current}</strong> active borrow(s) — their limit is <strong>{limitOverrideInfo?.limit}</strong>.
+              <br /><br />You can override this limit as staff. Optionally note a reason:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            className="rounded-xl resize-none text-sm"
+            rows={2}
+            placeholder="Reason for override (optional)..."
+            value={limitOverrideReason}
+            onChange={e => setLimitOverrideReason(e.target.value)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setLimitOverridePending(null); setLimitOverrideReason('') }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLimitOverrideConfirm} className="bg-amber-600 hover:bg-amber-700">
+              Override &amp; Proceed
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -21,6 +21,7 @@ const adminNav: Record<string, NavItemConfig[]> = {
     { label: 'Manage Books', href: '/dashboard/admin/books', icon: BookOpen },
     { label: 'Manage Shelves', href: '/dashboard/admin/shelves', icon: Library },
     { label: 'Manage Categories', href: '/dashboard/admin/categories', icon: Tag },
+    { label: 'Manage Tags', href: '/dashboard/admin/tags', icon: Tag },
     { label: 'Borrow / Return', href: '/dashboard/admin/borrow-return', icon: ArrowLeftRight },
     { label: 'Transactions', href: '/dashboard/admin/transactions', icon: ArrowLeftRight },
     { label: 'Reservation Calendar', href: '/dashboard/admin/calendar', icon: CalendarDays },

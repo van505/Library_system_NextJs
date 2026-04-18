@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     // 2. Fetch ALL available books with shelf/location info
     const { data: availableBooks } = await supabase
       .from('books')
-      .select('title, author, available_copies, total_copies, shelves(name, location), book_categories(categories(name))')
+      .select('title, author, available_copies, total_copies, shelves(name, location), book_categories(categories(name)), book_tags(tags(name))')
       .gt('available_copies', 0)
 
     let contextData = ''
@@ -34,11 +34,12 @@ export async function POST(req: Request) {
           .map((bc: any) => bc.categories?.name)
           .filter(Boolean)
           .join(', ')
+        const tags = ((b as any).book_tags ?? []).map((bt: any) => bt.tags?.name).filter(Boolean).join(', ')
         const shelf = (b.shelves as any)
         const location = shelf
           ? 'Located at: Shelf "' + shelf.name + '"' + (shelf.location ? ', ' + shelf.location : '') + '.'
           : 'Shelf location: Not assigned.'
-        return '"' + b.title + '" by ' + b.author + '. ' + location + ' Available: ' + b.available_copies + '/' + b.total_copies + ' copies.' + (cats ? ' Categories: ' + cats + '.' : '')
+        return '"' + b.title + '" by ' + b.author + '. ' + location + ' Available: ' + b.available_copies + '/' + b.total_copies + ' copies.' + (cats ? ' Categories: ' + cats + '.' : '') + (tags ? ' Tags: ' + tags + '.' : '')
       }).join('\n')
     }
 

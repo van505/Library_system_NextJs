@@ -6,12 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase'
-import { BookOpen, Clock, CheckCircle, AlertTriangle, ArrowRight, Sparkles, MessageSquare, History, Bell, Search } from 'lucide-react'
+import { BookOpen, Clock, CheckCircle, AlertTriangle, ArrowRight, Sparkles, MessageSquare, History, Bell, Search, Crown, Star } from 'lucide-react'
 import { format, isPast, differenceInDays } from 'date-fns'
 import Link from 'next/link'
+import { checkBorrowingLimit, type BorrowLimitResult } from '@/lib/borrowingLimit'
+import { checkAndSendReminders } from '@/lib/dueDateReminders'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function StudentDashboard() {
   const supabase = createClient()
+  const { t: tr } = useLanguage()
   const [loading, setLoading] = React.useState(true)
   
   // Data
@@ -20,18 +24,37 @@ export default function StudentDashboard() {
   const [stats, setStats] = React.useState({ total: 0, active: 0, returned: 0, overdue: 0 })
   const [latestBooks, setLatestBooks] = React.useState<any[]>([])
   const [announcements, setAnnouncements] = React.useState<any[]>([])
+  const [borrowLimit, setBorrowLimit] = React.useState<BorrowLimitResult | null>(null)
+  const [hasDueSoon, setHasDueSoon] = React.useState(false)
+  const [hasOverdue, setHasOverdue] = React.useState(false)
+  // Feature W
+  const [bookOfMonth, setBookOfMonth] = React.useState<any>(null)
+  const [featuredBooks, setFeaturedBooks] = React.useState<any[]>([])
 
   async function loadData() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const [pRes, txRes, bRes, aRes] = await Promise.all([
+    const [pRes, txRes, bRes, aRes, botmRes, featRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase.from('transactions').select('*, books(title, author, cover_url, categories(color))').eq('borrower_id', user.id).order('borrowed_at', { ascending: false }),
       supabase.from('books').select('*, categories(name, color)').order('created_at', { ascending: false }).limit(4),
-      supabase.from('announcements').select('*').eq('is_active', true).order('created_at', { ascending: false })
+      supabase.from('announcements').select('*').eq('is_active', true).order('created_at', { ascending: false }),
+      supabase.from('books').select('*, shelves(name), book_categories(categories(name,color))').eq('is_book_of_month', true).eq('is_archived', false).single(),
+      supabase.from('books').select('*, shelves(name), book_categories(categories(name,color))').eq('is_featured', true).eq('is_archived', false).neq('is_book_of_month', true).order('title'),
     ])
+
+    const limitResult = await checkBorrowingLimit(supabase, user.id)
+    setBorrowLimit(limitResult)
+
+    // Trigger reminders once per session
+    try {
+      if (!sessionStorage.getItem('reminders_checked')) {
+        await checkAndSendReminders(supabase, user.id)
+        sessionStorage.setItem('reminders_checked', 'true')
+      }
+    } catch { /* never block page load */ }
 
     setProfile(pRes.data)
     
@@ -42,8 +65,21 @@ export default function StudentDashboard() {
     
     setStats({ total: allTx.length, active: active.length, returned, overdue })
     setActiveTx(active)
+
+    // Compute due-soon and overdue flags for banners
+    const today = new Date()
+    const dueSoon = active.some(t => {
+      if (!t.due_date) return false
+      const days = differenceInDays(new Date(t.due_date), today)
+      return days >= 0 && days <= 3
+    })
+    const overdueFlag = active.some(t => t.due_date && isPast(new Date(t.due_date)))
+    setHasDueSoon(dueSoon)
+    setHasOverdue(overdueFlag)
     setLatestBooks(bRes.data ?? [])
     setAnnouncements(aRes.data ?? [])
+    setBookOfMonth(botmRes.data ?? null)
+    setFeaturedBooks(featRes.data ?? [])
 
     setLoading(false)
   }
@@ -91,6 +127,26 @@ export default function StudentDashboard() {
         </div>
       </div>
 
+      {/* Due Date Alert Banners (Feature R) */}
+      {hasOverdue && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 border-l-4 border-l-red-500 rounded-xl p-4 shadow-sm">
+          <AlertTriangle className="size-5 text-red-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-red-800">{tr('overdueAlert')}</p>
+            <p className="text-sm text-red-700 mt-0.5">{tr('overdueMsg')} <Link href="/dashboard/student/borrowed" className="underline font-semibold">{tr('viewOverdueBooks')} →</Link></p>
+          </div>
+        </div>
+      )}
+      {!hasOverdue && hasDueSoon && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-500 rounded-xl p-4 shadow-sm">
+          <Clock className="size-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-amber-800">{tr('dueSoonAlert')}</p>
+            <p className="text-sm text-amber-700 mt-0.5">{tr('dueSoonMsg')} <Link href="/dashboard/student/borrowed" className="underline font-semibold">{tr('viewBorrowedBooks')} →</Link></p>
+          </div>
+        </div>
+      )}
+
       {/* Announcements */}
       {announcements.length > 0 && (
         <div className="space-y-2">
@@ -121,10 +177,10 @@ export default function StudentDashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Books Borrowed', v: stats.total, icon: History, c: 'text-primary bg-primary/10 border-primary/20' },
-          { label: 'Currently Active', v: stats.active, icon: BookOpen, c: 'text-blue-600 bg-blue-50 border-blue-100' },
-          { label: 'Books Returned', v: stats.returned, icon: CheckCircle, c: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-          { label: 'Overdue Books', v: stats.overdue, icon: AlertTriangle, c: `text-red-600 ${stats.overdue > 0 ? 'bg-red-50 border-red-200 shadow-sm shadow-red-100' : 'bg-slate-50 border-slate-100 text-slate-400'}` }
+          { label: tr('booksBorrowed'), v: stats.total, icon: History, c: 'text-primary bg-primary/10 border-primary/20' },
+          { label: tr('currentlyActive'), v: stats.active, icon: BookOpen, c: 'text-blue-600 bg-blue-50 border-blue-100' },
+          { label: tr('booksReturned'), v: stats.returned, icon: CheckCircle, c: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+          { label: tr('overdueBooks'), v: stats.overdue, icon: AlertTriangle, c: `text-red-600 ${stats.overdue > 0 ? 'bg-red-50 border-red-200 shadow-sm shadow-red-100' : 'bg-slate-50 border-slate-100 text-slate-400'}` }
         ].map((s,i) => (
           <Card key={i} className={`border rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${s.c}`}>
             <CardContent className="p-5">
@@ -139,6 +195,115 @@ export default function StudentDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Borrowing Capacity Bar */}
+      {borrowLimit && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-bold text-slate-800">{tr('borrowingCapacity')}</p>
+              <p className="text-xs text-slate-500">{borrowLimit.current} of {borrowLimit.limit} {tr('slotsUsed')}</p>
+            </div>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+              borrowLimit.current >= borrowLimit.limit
+                ? 'bg-red-100 text-red-700'
+                : borrowLimit.current >= Math.ceil(borrowLimit.limit * 0.5)
+                ? 'bg-amber-100 text-amber-700'
+                : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              {borrowLimit.current >= borrowLimit.limit ? tr('limitReached') : `${borrowLimit.limit - borrowLimit.current} ${tr('available')}`}
+            </span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+            <div
+              className={`h-2.5 rounded-full transition-all duration-700 ${
+                borrowLimit.current >= borrowLimit.limit
+                  ? 'bg-red-500'
+                  : borrowLimit.current >= Math.ceil(borrowLimit.limit * 0.5)
+                  ? 'bg-amber-400'
+                  : 'bg-emerald-500'
+              }`}
+              style={{ width: `${Math.min((borrowLimit.current / borrowLimit.limit) * 100, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Book of the Month (Feature W) */}
+      {bookOfMonth && (
+        <div className="relative overflow-hidden rounded-3xl border border-amber-200 shadow-lg bg-gradient-to-br from-amber-50 via-amber-100 to-yellow-100">
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-400/10 to-transparent pointer-events-none" />
+          <div className="p-6 flex flex-col md:flex-row gap-6 items-center relative z-10">
+            {/* Cover */}
+            <div className="w-32 h-44 rounded-2xl overflow-hidden shrink-0 shadow-xl border-2 border-amber-300">
+              {bookOfMonth.cover_url ? (
+                <img src={bookOfMonth.cover_url} className="w-full h-full object-cover" alt={bookOfMonth.title} />
+              ) : (
+                <div className="w-full h-full bg-amber-400 flex items-center justify-center">
+                <span className="text-white text-3xl font-black">{bookOfMonth.title.charAt(0)}</span>
+                </div>
+              )}
+            </div>
+            {/* Info */}
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2">
+                <Crown className="size-5 text-amber-600" />
+                <span className="text-xs font-black uppercase tracking-wider text-amber-700 bg-amber-200 px-2.5 py-1 rounded-full">Book of the Month</span>
+              </div>
+              <h2 className="text-2xl font-black text-amber-900 leading-tight">{bookOfMonth.title}</h2>
+              <p className="text-amber-700 font-semibold">by {bookOfMonth.author}</p>
+              {bookOfMonth.featured_note && (
+                <p className="text-sm text-amber-800 italic bg-amber-200/50 rounded-xl px-3 py-2">&ldquo;{bookOfMonth.featured_note}&rdquo;</p>
+              )}
+              <div className="flex items-center gap-3">
+                <Badge className={`border-transparent font-bold ${
+                  bookOfMonth.available_copies > 0 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {bookOfMonth.available_copies > 0 ? `${bookOfMonth.available_copies} Available` : 'Borrowed Out'}
+                </Badge>
+                <Button asChild size="sm" className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold">
+                  <Link href={`/dashboard/student/browse?book=${bookOfMonth.id}`}>View Details</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Featured Books (Feature W) */}
+      {featuredBooks.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Star className="size-5 text-amber-500 fill-amber-400" />
+            <h2 className="text-lg font-bold text-slate-900">Featured Books</h2>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
+            {featuredBooks.map(b => {
+              const cats = (b.book_categories ?? []).map((bc: any) => bc.categories).filter(Boolean)
+              return (
+                <Link key={b.id} href={`/dashboard/student/browse?book=${b.id}`}
+                  className="shrink-0 w-36 group cursor-pointer">
+                  <div className="aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 mb-2 shadow-sm group-hover:shadow-lg transition-all group-hover:-translate-y-1">
+                    {b.cover_url ? (
+                      <img src={b.cover_url} className="w-full h-full object-cover" alt={b.title} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-200">
+                        <BookOpen className="size-8 text-slate-400" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs font-bold text-slate-800 leading-tight line-clamp-2">{b.title}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 truncate">{b.author}</p>
+                  {cats[0] && (
+                    <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-1"
+                      style={{ backgroundColor: `${cats[0].color}20`, color: cats[0].color }}>{cats[0].name}</span>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         

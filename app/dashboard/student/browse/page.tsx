@@ -10,14 +10,17 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
-import { Search, MapPin, BookOpen, User, Star, CalendarCheck } from 'lucide-react'
+import { Search, MapPin, BookOpen, User, Star, CalendarCheck, AlertCircle, Tag } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { toInputDate, getMinReturnDate, getMaxReturnDate, validateReturnDate } from '@/lib/dateUtils'
 import { notifyRoles } from '@/lib/notifyAdmins'
+import { checkBorrowingLimit, type BorrowLimitResult } from '@/lib/borrowingLimit'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 type BookCat = { id: string; name: string; color: string; icon: string }
+type TagItem = { id: string; name: string; color: string }
 type BookRow = {
   id: string
   title: string
@@ -32,10 +35,12 @@ type BookRow = {
   publisher: string | null
   shelves?: { name: string; location: string } | null
   book_categories?: { categories: BookCat }[]
+  book_tags?: { tags: TagItem }[]
 }
 
 export default function StudentBrowsePage() {
   const supabase = createClient()
+  const { t } = useLanguage()
   const [books, setBooks] = React.useState<BookRow[]>([])
   const [allCategories, setAllCategories] = React.useState<BookCat[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -49,6 +54,14 @@ export default function StudentBrowsePage() {
   const [requesting, setRequesting] = React.useState(false)
   const [myId, setMyId] = React.useState<string | null>(null)
 
+  // ── Borrow limit ─────────────────────────────────────────────────────────
+  const [borrowLimit, setBorrowLimit] = React.useState<BorrowLimitResult | null>(null)
+  // ── Tag filter (Feature T) ──────────────────────────────────────────────────
+  const [allTags, setAllTags] = React.useState<TagItem[]>([])
+  const [selectedTagIds, setSelectedTagIds] = React.useState<string[]>([])
+  const [tagDropdownOpen, setTagDropdownOpen] = React.useState(false)
+  const tagDropdownRef = React.useRef<HTMLDivElement>(null)
+
   // ── Return date dialog ────────────────────────────────────────────────────
   const [returnDateDialogOpen, setReturnDateDialogOpen] = React.useState(false)
   const [proposedReturnDate, setProposedReturnDate] = React.useState('')
@@ -57,17 +70,23 @@ export default function StudentBrowsePage() {
   async function loadData() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) setMyId(user.id)
+    if (user) {
+      setMyId(user.id)
+      const limitResult = await checkBorrowingLimit(supabase, user.id)
+      setBorrowLimit(limitResult)
+    }
 
-    const [bRes, cRes] = await Promise.all([
+    const [bRes, cRes, tRes] = await Promise.all([
       supabase
         .from('books')
-        .select('*, shelves(name, location), book_categories(categories(id, name, color, icon))')
+        .select('*, shelves(name, location), book_categories(categories(id, name, color, icon)), book_tags(tags(id, name, color))')
         .order('title'),
       supabase.from('categories').select('*').order('name'),
+      supabase.from('tags').select('*').order('name'),
     ])
     setBooks((bRes.data ?? []) as BookRow[])
     setAllCategories(cRes.data ?? [])
+    setAllTags(tRes.data ?? [])
     setLoading(false)
   }
 
@@ -99,9 +118,15 @@ export default function StudentBrowsePage() {
     setReviews(data ?? [])
   }
 
-  // Step 1: Student clicks "Request to Borrow" → open date picker dialog
+  // Step 1: Student clicks "Request to Borrow" → check limit first, then open date picker dialog
   function openReturnDateDialog() {
     if (!selectedBook || !myId) return
+    if (borrowLimit && !borrowLimit.allowed) {
+      toast.error(
+        `You have reached your borrowing limit of ${borrowLimit.limit} books. Please return a book before borrowing another.`
+      )
+      return
+    }
     setProposedReturnDate(toInputDate(getMinReturnDate()))
     setReturnDateError(null)
     setReturnDateDialogOpen(true)
@@ -147,18 +172,34 @@ export default function StudentBrowsePage() {
     return (b.book_categories ?? []).map((bc: any) => bc.categories).filter(Boolean)
   }
 
+  // Helper: get tags array from a book
+  function getBookTags(b: BookRow): TagItem[] {
+    return (b.book_tags ?? []).map((bt: any) => bt.tags).filter(Boolean)
+  }
+
+  function toggleTagFilter(tagId: string) {
+    setSelectedTagIds(prev =>
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    )
+  }
+
   const filtered = books.filter(b => {
     const q = search.toLowerCase()
     const bookCatIds = getBookCats(b).map(c => c.id)
+    const bookTagIds = getBookTags(b).map(t => t.id)
+    const matchTag = selectedTagIds.length === 0 || selectedTagIds.some(id => bookTagIds.includes(id))
     return (
       (q === '' || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)) &&
       (category === 'all' || bookCatIds.includes(category)) &&
-      (!availOnly || b.available_copies > 0)
+      (!availOnly || b.available_copies > 0) &&
+      matchTag
     )
   })
 
   const selectedBookCats = selectedBook ? getBookCats(selectedBook) : []
   const fallbackColor = selectedBookCats[0]?.color || '#cbd5e1'
+
+  const limitAtMax = borrowLimit ? borrowLimit.current >= borrowLimit.limit : false
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -166,12 +207,26 @@ export default function StudentBrowsePage() {
       {/* Search bar */}
       <div className="flex flex-col md:flex-row gap-6 md:items-end bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
         <div className="flex-1 space-y-4 w-full">
-          <h1 className="text-2xl font-bold text-slate-900">Library Catalog</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold text-slate-900">{t('libraryCatalog')}</h1>
+            {borrowLimit && (
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${
+                limitAtMax
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : borrowLimit.current >= Math.ceil(borrowLimit.limit * 0.67)
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {limitAtMax && <AlertCircle className="size-3.5" />}
+                {t('activeBorrows')}: {borrowLimit.current} / {borrowLimit.limit}
+              </div>
+            )}
+          </div>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 size-5" />
             <Input
               className="pl-12 h-14 rounded-2xl bg-slate-50 border-transparent focus-visible:bg-white text-lg shadow-inner"
-              placeholder="Search by book title or author..."
+              placeholder={t('searchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -180,7 +235,7 @@ export default function StudentBrowsePage() {
         <div className="flex flex-col gap-4 shrink-0 text-sm">
           <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100 self-start">
             <Switch checked={availOnly} onCheckedChange={setAvailOnly} />
-            <span className="font-semibold text-slate-700 select-none">Available Only</span>
+            <span className="font-semibold text-slate-700 select-none">{t('availableOnly')}</span>
           </div>
         </div>
       </div>
@@ -190,7 +245,7 @@ export default function StudentBrowsePage() {
         <Tabs value={category} onValueChange={setCategory} className="w-max">
           <TabsList className="bg-transparent space-x-2 h-auto p-0">
             <TabsTrigger value="all" className="rounded-full px-6 py-2.5 bg-white border border-slate-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all">
-              All Genres
+              {t('allGenres')}
             </TabsTrigger>
             {allCategories.map(c => (
               <TabsTrigger key={c.id} value={c.id} className="rounded-full px-5 py-2.5 bg-white border border-slate-200 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary shadow-sm transition-all">
@@ -200,6 +255,41 @@ export default function StudentBrowsePage() {
           </TabsList>
         </Tabs>
       </div>
+
+      {/* Tag filter chips (Feature T) */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <Tag className="size-3" /> Tags:
+          </span>
+          {selectedTagIds.length > 0 && (
+            <button
+              onClick={() => setSelectedTagIds([])}
+              className="text-xs text-slate-500 hover:text-slate-800 underline"
+            >
+              Clear
+            </button>
+          )}
+          {allTags.map(tag => (
+            <button
+              key={tag.id}
+              onClick={() => toggleTagFilter(tag.id)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${
+                selectedTagIds.includes(tag.id)
+                  ? 'shadow-sm scale-105'
+                  : 'opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: selectedTagIds.includes(tag.id) ? `${tag.color}25` : `${tag.color}10`,
+                color: tag.color,
+                borderColor: selectedTagIds.includes(tag.id) ? `${tag.color}60` : `${tag.color}30`,
+              }}
+            >
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Book grid */}
       {loading ? (
@@ -263,6 +353,19 @@ export default function StudentBrowsePage() {
                       </Badge>
                     )}
                   </div>
+                  {/* Tag chips (Feature T) */}
+                  {(() => { const bTags = getBookTags(b); return bTags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {bTags.slice(0, 2).map(tag => (
+                        <span
+                          key={tag.id}
+                          className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                        >{tag.name}</span>
+                      ))}
+                      {bTags.length > 2 && <span className="text-[9px] text-slate-400">+{bTags.length - 2}</span>}
+                    </div>
+                  ) : null })()}
                 </CardContent>
               </Card>
             )
@@ -378,14 +481,22 @@ export default function StudentBrowsePage() {
                 </div>
 
                 {/* CTA */}
-                <div className="mt-6 pt-6 border-t border-slate-100">
+                <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
+                  {limitAtMax && (
+                    <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                      <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                      <span>You have reached your borrowing limit of <strong>{borrowLimit?.limit}</strong> books. Return a book before borrowing another.</span>
+                    </div>
+                  )}
                   {selectedBook.available_copies > 0 ? (
                     <Button
-                      className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-bold shadow-lg shadow-primary/20 gap-2 transition-transform hover:-translate-y-1"
+                      className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground text-lg font-bold shadow-lg shadow-primary/20 gap-2 transition-transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0"
                       onClick={openReturnDateDialog}
+                      disabled={limitAtMax}
+                      title={limitAtMax ? t('borrowLimitReached') : undefined}
                     >
                       <CalendarCheck className="size-5" />
-                      Request to Borrow
+                      {t('requestToBorrow')}
                     </Button>
                   ) : (
                     <Button asChild variant="outline" className="w-full h-14 rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50 font-bold">
