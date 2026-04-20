@@ -149,19 +149,46 @@ export default function HomePage() {
           {/* Premium Glassmorphic Search Bar */}
           <div className="relative w-full max-w-2xl mt-6 group">
             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-            <div className="relative flex items-center bg-white/80 backdrop-blur-xl border border-white rounded-2xl shadow-xl overflow-hidden p-2">
-              <Search className="size-5 text-indigo-400 ml-4 shrink-0" />
-              <input
-                type="text"
-                placeholder="Search by title, author, or keyword..."
-                className="w-full h-12 px-4 bg-transparent text-slate-800 placeholder-slate-400 focus:outline-none text-base"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-              <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-6 h-10 shadow-md">
-                Search
-              </Button>
-            </div>
+              <div className="relative flex items-center bg-white/80 backdrop-blur-xl border border-white rounded-2xl shadow-xl overflow-hidden p-2">
+                <Search className="size-5 text-indigo-400 ml-4 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search catalog or ask Libby..."
+                  className="w-full h-12 px-4 bg-transparent text-slate-800 placeholder-slate-400 focus:outline-none text-base"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      document.getElementById('browse-section')?.scrollIntoView({ behavior: 'smooth' })
+                    }
+                  }}
+                />
+                <div className="flex gap-2 shrink-0">
+                  <Button 
+                    size="sm" 
+                    variant="ghost"
+                    className="text-indigo-600 hover:bg-indigo-50 font-bold h-10 px-4 rounded-xl hidden sm:flex"
+                    onClick={() => {
+                      if (search.trim()) {
+                         window.location.href = '/chat?q=' + encodeURIComponent(search.trim())
+                      } else {
+                         window.location.href = '/chat'
+                      }
+                    }}
+                  >
+                    <Bot className="size-4 mr-2" /> Ask AI
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-6 h-10 shadow-md"
+                    onClick={() => {
+                      document.getElementById('browse-section')?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                  >
+                    Search
+                  </Button>
+                </div>
+              </div>
           </div>
 
           {!profile ? (
@@ -225,7 +252,7 @@ export default function HomePage() {
       )}
 
       {/* ── Section 2: Featured Books ────────────────────────────────────────── */}
-      <section className="py-24 px-4 max-w-7xl mx-auto w-full relative z-20">
+      <section id="browse-section" className="py-24 px-4 max-w-7xl mx-auto w-full relative z-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
           <div>
             <h2 className="text-4xl font-black text-slate-900 tracking-tight">Browse Collection</h2>

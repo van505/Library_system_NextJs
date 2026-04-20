@@ -12,8 +12,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<{role: 'ai'|'user', content: string}[]>([{
-    role: 'ai',
+  const [messages, setMessages] = useState<{role: 'assistant'|'user', content: string}[]>([{
+    role: 'assistant',
     content: "Hi! I'm Libby, your AI Librarian. Ask me about any books, subjects, or check if something is available on the shelves!"
   }])
   const [input, setInput] = useState('')
@@ -22,16 +22,40 @@ export default function ChatPage() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
+  useEffect(() => {
+    // Only run once on mount
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const q = params.get('q')
+      if (q && messages.length === 1) { // messages.length === 1 means only the initial greeting is there
+        // Clear param from URL
+        window.history.replaceState({}, '', '/chat')
+        
+        const userMsg = q.trim()
+        const newMessages: {role: 'assistant'|'user', content: string}[] = [...messages, { role: 'user', content: userMsg }]
+        setMessages(newMessages)
+        setLoading(true)
+        
+        axios.post('/api/chat', { messages: newMessages })
+          .then(res => setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply }]))
+          .catch(e => toast.error(e.response?.data?.error || 'Failed to connect to AI'))
+          .finally(() => setLoading(false))
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty dependency array intentionally for mount only
+
   async function handleSend() {
     if (!input.trim()) return
     const userMsg = input.trim()
     setInput('')
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    const newMessages: {role: 'assistant'|'user', content: string}[] = [...messages, { role: 'user', content: userMsg }]
+    setMessages(newMessages)
     setLoading(true)
     
     try {
-      const res = await axios.post('/api/chat', { message: userMsg })
-      setMessages(prev => [...prev, { role: 'ai', content: res.data.reply }])
+      const res = await axios.post('/api/chat', { messages: newMessages })
+      setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply }])
     } catch (e: any) {
       toast.error(e.response?.data?.error || 'Failed to connect to AI')
     } finally {
@@ -68,7 +92,7 @@ export default function ChatPage() {
         <div className="flex flex-col gap-6">
           {messages.map((m, i) => (
              <div key={i} className={`flex gap-4 ${m.role === 'user' ? 'justify-end' : ''}`}>
-               {m.role === 'ai' && (
+               {m.role === 'assistant' && (
                  <div className="size-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 border border-indigo-200 mt-1">
                    <Bot className="size-4 text-indigo-700" />
                  </div>
