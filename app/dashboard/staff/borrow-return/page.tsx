@@ -44,7 +44,8 @@ export default function StaffTransactionsPage() {
   const [bookSearch, setBookSearch] = React.useState('')
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [selectedBook, setSelectedBook] = React.useState<any | null>(null)
-  const [dueDate, setDueDate] = React.useState(toInputDate(addDays(new Date(), 14)))
+  const [dueDate, setDueDate] = React.useState(toInputDate(getMinReturnDate()))
+  const [dueDateError, setDueDateError] = React.useState<string | null>(null)
   const [notes, setNotes] = React.useState('')
   const [borrowing, setBorrowing] = React.useState(false)
   const [studentResults, setStudentResults] = React.useState<any[]>([])
@@ -139,7 +140,7 @@ export default function StaffTransactionsPage() {
   function resetBorrow() {
     setSelectedStudent(null); setSelectedBook(null)
     setStudentSearch(''); setBookSearch('')
-    setDueDate(toInputDate(addDays(new Date(), 14))); setNotes(''); setIsOpen(true)
+    setDueDate(toInputDate(getMinReturnDate())); setDueDateError(null); setNotes(''); setIsOpen(true)
   }
 
   // ── Confirm override and proceed with pending action ──────────────────
@@ -157,7 +158,7 @@ export default function StaffTransactionsPage() {
     e.preventDefault()
     if (!selectedStudent || !selectedBook) { toast.error('Please select both a student and a book.'); return }
     const err = validateReturnDate(dueDate)
-    if (err) { toast.error(err); return }
+    if (err) { setDueDateError(err); toast.error(err); return }
 
     // Check borrow limit
     const limitCheck = await checkBorrowingLimit(supabase, selectedStudent.id)
@@ -477,16 +478,32 @@ export default function StaffTransactionsPage() {
               <div className="space-y-2">
                 <Label>Due Date</Label>
                 <input type="date" required
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                  className={`w-full h-10 px-3 rounded-xl border text-sm focus:outline-none focus:ring-2 bg-white transition-colors ${
+                    dueDateError
+                      ? 'border-red-400 focus:ring-red-400 bg-red-50'
+                      : 'border-slate-200 focus:ring-primary'
+                  }`}
                   min={toInputDate(getMinReturnDate())} max={toInputDate(getMaxReturnDate())}
-                  value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  value={dueDate}
+                  onChange={e => {
+                    setDueDate(e.target.value)
+                    setDueDateError(validateReturnDate(e.target.value))
+                  }}
+                />
+                {dueDateError && (
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-red-600">
+                    <AlertTriangle className="size-3.5 shrink-0" />
+                    {dueDateError}
+                  </p>
+                )}
+                <p className="text-[11px] text-slate-400">Saturdays and Sundays are not allowed as return dates.</p>
               </div>
               <div className="space-y-2">
                 <Label>Notes (Optional)</Label>
                 <Textarea value={notes} onChange={e => setNotes(e.target.value)} className="rounded-xl resize-none" rows={2} />
               </div>
 
-              <Button type="submit" disabled={borrowing || !selectedStudent || !selectedBook} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-transform hover:-translate-y-0.5">
+              <Button type="submit" disabled={borrowing || !selectedStudent || !selectedBook || !!dueDateError} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl transition-transform hover:-translate-y-0.5">
                 {borrowing ? 'Processing...' : 'Confirm Issuance'}
               </Button>
             </form>
