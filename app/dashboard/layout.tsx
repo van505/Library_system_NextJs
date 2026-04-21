@@ -6,8 +6,9 @@ import AdminSidebar from '@/components/dashboard/admin-sidebar'
 import StaffSidebar from '@/components/dashboard/staff-sidebar'
 import StudentSidebar from '@/components/dashboard/student-sidebar'
 import ProfileDropdown from '@/components/dashboard/profile-dropdown'
-import { Bell, Search, ChevronRight } from 'lucide-react'
+import { Bell, Search, ChevronRight, CalendarDays } from 'lucide-react'
 import { NotificationsPanel } from '@/components/dashboard/notifications-panel'
+import Link from 'next/link'
 
 // Dummy component to fetch unread requests if admin/staff
 async function TopBarRight({ profile }: { profile: any }) {
@@ -20,8 +21,14 @@ async function TopBarRight({ profile }: { profile: any }) {
     pendingBadge = count || 0
   }
 
+  const calendarHref = profile?.role === 'admin'
+    ? '/dashboard/admin/calendar'
+    : profile?.role === 'staff'
+    ? '/dashboard/staff/calendar'
+    : null
+
   return (
-    <div className="flex items-center gap-4 ml-auto">
+    <div className="flex items-center gap-3 ml-auto">
       <div className="relative hidden md:flex items-center w-64">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
         <input 
@@ -30,6 +37,15 @@ async function TopBarRight({ profile }: { profile: any }) {
           className="w-full h-9 pl-9 pr-4 rounded-full bg-slate-100 border-none text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm inset-shadow-sm" 
         />
       </div>
+      {calendarHref && (
+        <Link
+          href={calendarHref}
+          title="Reservation Calendar"
+          className="relative flex items-center justify-center size-9 rounded-full bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-500 transition-colors border border-slate-200 shadow-sm"
+        >
+          <CalendarDays className="size-4" />
+        </Link>
+      )}
       <NotificationsPanel />
       <ProfileDropdown profile={profile} />
     </div>

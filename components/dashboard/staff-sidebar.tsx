@@ -20,7 +20,6 @@ const staffNav: Record<string, NavItemConfig[]> = {
     { label: 'Books Catalog', href: '/dashboard/staff/books', icon: BookOpen },
     { label: 'Shelves', href: '/dashboard/staff/shelves', icon: Library },
     { label: 'Borrow / Return', href: '/dashboard/staff/borrow-return', icon: ArrowLeftRight },
-    { label: 'Reservation Calendar', href: '/dashboard/staff/calendar', icon: CalendarDays },
     { label: 'Archive', href: '/dashboard/staff/archive', icon: Archive },
   ],
   TOOLS: [
