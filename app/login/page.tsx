@@ -13,7 +13,9 @@ import { useAuthStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { BookOpen, Sparkles, ChevronLeft, ArrowRight } from 'lucide-react'
 
+
 export default function LoginPage() {
+
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,14 +25,17 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
+
     const supabase = createClient()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
 
     if (error) {
       toast.error(error.message)
       setLoading(false)
       return
     }
+
 
     if (data.user) {
       // Fetch profile to determine role-based redirect
@@ -40,6 +45,8 @@ export default function LoginPage() {
         .eq('id', data.user.id)
         .single()
 
+
+
       if (profileError || !profile) {
         toast.success('Welcome!')
         window.location.href = '/dashboard'
@@ -48,6 +55,7 @@ export default function LoginPage() {
 
       useAuthStore.getState().setProfile({ ...profile, id: data.user.id } as any)
       toast.success('Welcome back!')
+
 
       if (profile.role === 'admin') {
         router.push('/dashboard/admin')
@@ -64,7 +72,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex text-slate-900 bg-[#f8fafc] font-sans selection:bg-indigo-500/30">
       {/* Left side - Form */}
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-12 lg:px-24 relative z-10">
-        
+
         {/* Subtle Background Effects */}
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-400/10 blur-[100px] rounded-[100%] pointer-events-none -z-10" />
 
@@ -88,14 +96,14 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email" className="font-semibold text-slate-700">Email address</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="you@school.edu" 
-                required 
-                className="h-12 rounded-xl bg-white border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@school.edu"
+                required
+                className="h-12 rounded-xl bg-white border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -105,13 +113,13 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
-                className="h-12 rounded-xl bg-white border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
+              <Input
+                id="password"
+                type="password"
+                required
+                className="h-12 rounded-xl bg-white border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 shadow-sm transition-all"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
               />
             </div>
             <Button type="submit" className="w-full h-12 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-base font-bold shadow-lg transition-all mt-4 group" disabled={loading}>
@@ -141,9 +149,9 @@ export default function LoginPage() {
             <div className="size-14 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 mb-8 shadow-inner">
               <Sparkles className="size-6 text-indigo-300" />
             </div>
-            <h2 className="text-4xl font-black mb-4 leading-tight">Your digital <br/>library pass.</h2>
+            <h2 className="text-4xl font-black mb-4 leading-tight">Your digital <br />library pass.</h2>
             <p className="text-indigo-100/80 text-lg leading-relaxed mb-10">Access thousands of books, track your reading history, and ask our AI assistant for highly personalized recommendations.</p>
-            
+
             <div className="flex items-center gap-4 text-sm font-medium text-white/80 bg-white/5 rounded-2xl p-4 border border-white/10 w-fit backdrop-blur-md">
               <div className="flex -space-x-3">
                 {[

@@ -210,13 +210,12 @@ export default function StudentBrowsePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-bold text-slate-900">{t('libraryCatalog')}</h1>
             {borrowLimit && (
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${
-                limitAtMax
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${limitAtMax
                   ? 'bg-red-50 text-red-700 border-red-200'
                   : borrowLimit.current >= Math.ceil(borrowLimit.limit * 0.67)
-                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              }`}>
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}>
                 {limitAtMax && <AlertCircle className="size-3.5" />}
                 {t('activeBorrows')}: {borrowLimit.current} / {borrowLimit.limit}
               </div>
@@ -274,11 +273,10 @@ export default function StudentBrowsePage() {
             <button
               key={tag.id}
               onClick={() => toggleTagFilter(tag.id)}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${
-                selectedTagIds.includes(tag.id)
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${selectedTagIds.includes(tag.id)
                   ? 'shadow-sm scale-105'
                   : 'opacity-60 hover:opacity-100'
-              }`}
+                }`}
               style={{
                 backgroundColor: selectedTagIds.includes(tag.id) ? `${tag.color}25` : `${tag.color}10`,
                 color: tag.color,
@@ -354,18 +352,20 @@ export default function StudentBrowsePage() {
                     )}
                   </div>
                   {/* Tag chips (Feature T) */}
-                  {(() => { const bTags = getBookTags(b); return bTags.length > 0 ? (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {bTags.slice(0, 2).map(tag => (
-                        <span
-                          key={tag.id}
-                          className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
-                        >{tag.name}</span>
-                      ))}
-                      {bTags.length > 2 && <span className="text-[9px] text-slate-400">+{bTags.length - 2}</span>}
-                    </div>
-                  ) : null })()}
+                  {(() => {
+                    const bTags = getBookTags(b); return bTags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {bTags.slice(0, 2).map(tag => (
+                          <span
+                            key={tag.id}
+                            className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
+                          >{tag.name}</span>
+                        ))}
+                        {bTags.length > 2 && <span className="text-[9px] text-slate-400">+{bTags.length - 2}</span>}
+                      </div>
+                    ) : null
+                  })()}
                 </CardContent>
               </Card>
             )

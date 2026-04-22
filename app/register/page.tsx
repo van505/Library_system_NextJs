@@ -70,7 +70,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex text-slate-900 bg-[#f8fafc] font-sans selection:bg-indigo-500/30">
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-12 lg:px-24 relative z-10 py-12 overflow-y-auto">
-        
+
         {/* Subtle Background Effects */}
         <div className="fixed top-0 left-0 w-[500px] h-[500px] bg-purple-400/10 blur-[100px] rounded-[100%] pointer-events-none -z-10" />
 
@@ -128,7 +128,7 @@ export default function RegisterPage() {
           </p>
         </div>
       </div>
-      
+
       {/* Right side - Decorative Premium Panel */}
       <div className="hidden lg:flex flex-1 relative bg-slate-900 overflow-hidden items-center justify-center p-12">
         <div className="absolute inset-0 z-0 bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900" />
@@ -139,7 +139,7 @@ export default function RegisterPage() {
           <Card className="bg-white/10 backdrop-blur-xl border-white/10 text-white rounded-[2rem] p-10 shadow-2xl overflow-hidden relative">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
             <BookOpen className="size-16 text-indigo-300 mx-auto mb-6" />
-            <h2 className="text-4xl font-black mb-4 leading-tight">Join SchoolLib<br/>Today.</h2>
+            <h2 className="text-4xl font-black mb-4 leading-tight">Join SchoolLib<br />Today.</h2>
             <p className="text-indigo-100/80 text-lg leading-relaxed mb-6">
               Empower your learning journey. Borrow books, organize your reading lists, and utilize our next-gen AI librarian to find the exact resources you need.
             </p>
