@@ -43,7 +43,7 @@ export default function LibbyChatPage() {
 
   async function handleSend(text: string) {
     if (!text.trim()) return
-    
+
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
@@ -59,8 +59,8 @@ export default function LibbyChatPage() {
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to communicate with Libby')
-      
-      const botMsg: Message = { id: (Date.now()+1).toString(), role: 'assistant', content: data.reply, timestamp: new Date() }
+
+      const botMsg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: data.reply, timestamp: new Date() }
       setMessages(prev => [...prev, botMsg])
 
     } catch (err: any) {
@@ -77,18 +77,18 @@ export default function LibbyChatPage() {
   return (
     <div className="max-w-4xl mx-auto h-[calc(100vh-6rem)] min-h-[600px] flex flex-col p-4 md:p-6">
       <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm shrink-0">
-         <div className="flex items-center gap-4">
-           <div className="size-12 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
-             <Bot className="size-6 text-primary" />
-           </div>
-           <div>
-             <h1 className="font-bold text-slate-900 text-xl flex items-center gap-1.5"><Sparkles className="size-4 text-amber-400 fill-amber-400" /> Libby AI</h1>
-             <p className="text-xs text-slate-500 font-medium tracking-wide">YOUR PERSONAL LIBRARY ASSISTANT</p>
-           </div>
-         </div>
-         <Button variant="ghost" size="sm" onClick={handleClear} className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl px-3 h-10">
-           <Trash2 className="size-4 mr-2" /> Clear UI
-         </Button>
+        <div className="flex items-center gap-4">
+          <div className="size-12 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
+            <Bot className="size-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-bold text-slate-900 text-xl flex items-center gap-1.5"><Sparkles className="size-4 text-amber-400 fill-amber-400" /> Libby AI</h1>
+            <p className="text-xs text-slate-500 font-medium tracking-wide">YOUR PERSONAL LIBRARY ASSISTANT</p>
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={handleClear} className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl px-3 h-10">
+          <Trash2 className="size-4 mr-2" /> Clear UI
+        </Button>
       </div>
 
       <Card className="flex-1 rounded-[2rem] border-slate-200 shadow-sm flex flex-col overflow-hidden bg-slate-50/50">
@@ -102,11 +102,10 @@ export default function LibbyChatPage() {
                 </div>
                 {/* Bubble */}
                 <div className={`flex flex-col gap-1 max-w-[75%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`px-5 py-3.5 rounded-2xl shadow-sm text-sm break-words whitespace-pre-wrap leading-relaxed ${
-                    m.role === 'user'
+                  <div className={`px-5 py-3.5 rounded-2xl shadow-sm text-sm break-words whitespace-pre-wrap leading-relaxed ${m.role === 'user'
                       ? 'bg-primary text-primary-foreground rounded-tr-sm'
                       : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'
-                  }`}>
+                    }`}>
                     {m.content}
                   </div>
                   <span className="text-[10px] text-slate-400 font-medium uppercase px-1">
@@ -119,12 +118,12 @@ export default function LibbyChatPage() {
             {loading && (
               <div className="flex gap-4">
                 <div className="size-10 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm">
-                  <Bot className="size-5 text-primary-foreground"/>
+                  <Bot className="size-5 text-primary-foreground" />
                 </div>
                 <div className="bg-white border border-slate-200 rounded-[2rem] rounded-tl-sm px-6 py-5 shadow-sm flex items-center gap-1.5 h-[58px]">
-                   <span className="size-2 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                   <span className="size-2 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                   <span className="size-2 bg-primary/60 rounded-full animate-bounce"></span>
+                  <span className="size-2 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="size-2 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="size-2 bg-primary/60 rounded-full animate-bounce"></span>
                 </div>
               </div>
             )}
@@ -133,35 +132,35 @@ export default function LibbyChatPage() {
         </ScrollArea>
 
         <div className="p-4 bg-white border-t border-slate-100 shrink-0">
-           <div className="max-w-3xl mx-auto flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide shrink-0">
-             {chips.map((c, i) => (
-               <Button key={i} variant="outline" size="sm" onClick={() => handleSend(c)} disabled={loading} className="rounded-full bg-white text-primary border-primary/20 hover:bg-primary/10 shadow-sm whitespace-nowrap">
-                 {c}
-               </Button>
-             ))}
-           </div>
-           <form 
-             className="max-w-3xl mx-auto relative flex items-center" 
-             onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
-           >
-             <Input 
-               value={input} 
-               onChange={e => setInput(e.target.value)} 
-               placeholder="Ask Libby anything about the library..." 
-               disabled={loading}
-               className="h-16 pl-6 pr-16 rounded-full bg-slate-50 border-slate-200 shadow-inner text-base focus-visible:ring-indigo-500" 
-             />
-             <Button 
-               type="submit" 
-               disabled={loading || !input.trim()} 
-               className="absolute right-2 size-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md p-0"
-             >
-               <Send className="size-5 ml-1" />
-             </Button>
-           </form>
-           <p className="text-center text-[10px] text-slate-400 mt-4 uppercase tracking-widest font-bold">
-              Libby uses Google Gemini 2.5 Flash · Results may vary
-            </p>
+          <div className="max-w-3xl mx-auto flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide shrink-0">
+            {chips.map((c, i) => (
+              <Button key={i} variant="outline" size="sm" onClick={() => handleSend(c)} disabled={loading} className="rounded-full bg-white text-primary border-primary/20 hover:bg-primary/10 shadow-sm whitespace-nowrap">
+                {c}
+              </Button>
+            ))}
+          </div>
+          <form
+            className="max-w-3xl mx-auto relative flex items-center"
+            onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
+          >
+            <Input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="Ask Libby anything about the library..."
+              disabled={loading}
+              className="h-16 pl-6 pr-16 rounded-full bg-slate-50 border-slate-200 shadow-inner text-base focus-visible:ring-indigo-500"
+            />
+            <Button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="absolute right-2 size-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md p-0"
+            >
+              <Send className="size-5 ml-1" />
+            </Button>
+          </form>
+          <p className="text-center text-[10px] text-slate-400 mt-4 uppercase tracking-widest font-bold">
+            Libby uses Google Gemini 2.5 Flash · Results may vary
+          </p>
         </div>
       </Card>
     </div>

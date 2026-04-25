@@ -41,9 +41,8 @@ export async function POST(req: Request) {
     // Bulk update ALL student profiles (bypasses RLS via service role)
     const { error: profileError, count } = await serviceClient
       .from('profiles')
-      .update({ borrow_limit: newLimit })
+      .update({ borrow_limit: newLimit }, { count: 'exact' })
       .eq('role', 'student')
-      .select('*', { count: 'exact', head: true })
 
     if (profileError) {
       return NextResponse.json({ error: profileError.message }, { status: 500 })

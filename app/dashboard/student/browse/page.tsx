@@ -118,7 +118,7 @@ export default function StudentBrowsePage() {
     setReviews(data ?? [])
   }
 
-  // Step 1: Student clicks "Request to Borrow" → check limit first, then open date picker dialog
+  // Step 1: Student clicks "Request to Borrow" → check limit  first, then open date picker dialog
   function openReturnDateDialog() {
     if (!selectedBook || !myId) return
     if (borrowLimit && !borrowLimit.allowed) {
@@ -211,10 +211,10 @@ export default function StudentBrowsePage() {
             <h1 className="text-2xl font-bold text-slate-900">{t('libraryCatalog')}</h1>
             {borrowLimit && (
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold border ${limitAtMax
-                  ? 'bg-red-50 text-red-700 border-red-200'
-                  : borrowLimit.current >= Math.ceil(borrowLimit.limit * 0.67)
-                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                ? 'bg-red-50 text-red-700 border-red-200'
+                : borrowLimit.current >= Math.ceil(borrowLimit.limit * 0.67)
+                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 }`}>
                 {limitAtMax && <AlertCircle className="size-3.5" />}
                 {t('activeBorrows')}: {borrowLimit.current} / {borrowLimit.limit}
@@ -274,8 +274,8 @@ export default function StudentBrowsePage() {
               key={tag.id}
               onClick={() => toggleTagFilter(tag.id)}
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${selectedTagIds.includes(tag.id)
-                  ? 'shadow-sm scale-105'
-                  : 'opacity-60 hover:opacity-100'
+                ? 'shadow-sm scale-105'
+                : 'opacity-60 hover:opacity-100'
                 }`}
               style={{
                 backgroundColor: selectedTagIds.includes(tag.id) ? `${tag.color}25` : `${tag.color}10`,

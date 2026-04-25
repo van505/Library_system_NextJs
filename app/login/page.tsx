@@ -25,17 +25,14 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
-
     const supabase = createClient()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
 
     if (error) {
       toast.error(error.message)
       setLoading(false)
       return
     }
-
 
     if (data.user) {
       // Fetch profile to determine role-based redirect
